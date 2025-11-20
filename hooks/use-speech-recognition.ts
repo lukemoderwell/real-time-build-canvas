@@ -63,6 +63,7 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
   const [transcript, setTranscript] = useState("")
   const [isSupported, setIsSupported] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const isStartingRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -92,11 +93,14 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
           }
         }
 
-        setTranscript(interimTranscript || finalTranscript)
+        // Only show interim transcript in state - final results are handled via onResult callback
+        // This prevents double-counting when displaying cumulative + current transcript
+        setTranscript(interimTranscript)
       }
 
       recognition.onend = () => {
         setIsListening(false)
+        isStartingRef.current = false
       }
 
       recognition.onerror = (event) => {
@@ -109,6 +113,7 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
         if (onError) onError(event.error)
         setIsListening(false)
+        isStartingRef.current = false
       }
 
       recognitionRef.current = recognition
@@ -116,21 +121,25 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
   }, [onResult, onError])
 
   const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
+    if (recognitionRef.current && !isListening && !isStartingRef.current) {
       try {
+        isStartingRef.current = true
         recognitionRef.current.start()
         setIsListening(true)
-        setTranscript("")
+        // Don't reset transcript - let it accumulate
       } catch (error) {
         console.error("Error starting speech recognition:", error)
+        isStartingRef.current = false
+        setIsListening(false)
       }
     }
   }, [isListening])
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListening) {
+    if (recognitionRef.current && (isListening || isStartingRef.current)) {
       recognitionRef.current.stop()
       setIsListening(false)
+      isStartingRef.current = false
     }
   }, [isListening])
 

@@ -5,7 +5,7 @@ import type React from "react"
 import { motion } from "framer-motion"
 import type { NodeData } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, Circle, Clock, Loader2, FileText, Bug, Zap } from "lucide-react"
+import { CheckCircle2, Circle, Clock, Loader2, FileText, Palette, Code, Lightbulb } from "lucide-react"
 import { useState, useRef } from "react"
 
 interface NodeCardProps {
@@ -48,9 +48,9 @@ export function NodeCard({
 
   const TypeIcon =
     {
-      feature: Zap,
-      requirement: FileText,
-      bug: Bug,
+      product: Lightbulb,
+      design: Palette,
+      technical: Code,
       note: FileText,
     }[node.type] || FileText
 
@@ -121,12 +121,12 @@ export function NodeCard({
           <div
             className={cn(
               "p-1 rounded-md",
-              node.type === "feature"
-                ? "bg-blue-500/10 text-blue-500"
-                : node.type === "requirement"
-                  ? "bg-purple-500/10 text-purple-500"
-                  : node.type === "bug"
-                    ? "bg-red-500/10 text-red-500"
+              node.type === "product"
+                ? "bg-purple-500/10 text-purple-500"
+                : node.type === "design"
+                  ? "bg-pink-500/10 text-pink-500"
+                  : node.type === "technical"
+                    ? "bg-blue-500/10 text-blue-500"
                     : "bg-gray-500/10 text-gray-500",
             )}
           >

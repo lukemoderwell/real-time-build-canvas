@@ -1,4 +1,4 @@
-export type AgentRole = "designer" | "backend" | "cloud" | "product"
+export type AgentRole = "designer" | "backend" | "cloud" | "visionary"
 
 export interface DiaryEntry {
   id: string
@@ -23,7 +23,7 @@ export interface NodeData {
   id: string
   title: string
   content: string
-  type: "feature" | "requirement" | "bug" | "note"
+  type: "product" | "design" | "technical" | "note"
   status: "pending" | "processing" | "coded" | "review"
   x: number
   y: number
@@ -49,4 +49,11 @@ export interface CanvasState {
   groups: NodeGroup[]
   scale: number
   offset: { x: number; y: number }
+}
+
+export interface TranscriptEntry {
+  id: string
+  speaker: string
+  text: string
+  timestamp: number
 }
