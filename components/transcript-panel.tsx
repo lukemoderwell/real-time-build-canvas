@@ -31,15 +31,13 @@ export function TranscriptPanel({ fullTranscript, currentSessionText, isRecordin
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transcript</h2>
         {isRecording && (
-          <div className="flex gap-1 items-center">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <motion.div
-                key={i}
-                animate={{ height: [4, 12 + Math.random() * 12, 4] }}
-                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.5 + Math.random() * 0.5, delay: i * 0.1 }}
-                className="w-1 bg-red-500/50 rounded-full"
-              />
-            ))}
+          <div className="flex items-center gap-1.5">
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, ease: "easeInOut" }}
+              className="w-2 h-2 bg-red-500 rounded-full"
+            />
+            <span className="text-[10px] text-muted-foreground">Recording</span>
           </div>
         )}
       </div>

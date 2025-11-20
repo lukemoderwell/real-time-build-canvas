@@ -305,10 +305,10 @@ export function CanvasBoard({
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
             >
-              <StopCircle size={24} />
+              <StopCircle size={20} />
             </motion.div>
           ) : (
-            <Mic size={24} />
+            <Mic size={20} />
           )}
         </button>
       </div>
