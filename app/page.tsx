@@ -1,28 +1,26 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
 import { ControlBar } from '@/components/control-bar';
 import { StatusPanel } from '@/components/status-panel';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { FeatureDetailsPanel } from '@/components/feature-details-panel';
+import { CodingAgentPanel } from '@/components/coding-agent-panel';
 import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import type { Agent, NodeData, NodeGroup, TranscriptEntry } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import {
-  generateNodeTitle,
   generateAgentThoughts,
-  classifyRequirement,
   generateBuildPrompt,
+  analyzeTranscript,
+  extractFeatureDetails,
+  findMatchingFeature,
+  extractCapabilityDetails,
 } from './actions';
 
 // Mock Agents
@@ -36,39 +34,43 @@ const INITIAL_AGENTS: Agent[] = [
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '2',
     name: 'Mike',
-    role: 'backend engineer',
+    role: 'backend',
     avatar: '',
     color: '#3b82f6',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '3',
     name: 'Alex',
-    role: 'cloud architect',
+    role: 'cloud',
     avatar: '',
     color: '#f59e0b',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '4',
     name: 'Steve',
-    role: 'visionary founder',
+    role: 'visionary',
     avatar: '',
     color: '#8b5cf6',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
 ];
@@ -83,6 +85,7 @@ export default function Page() {
     message: string;
   } | null>(null);
   const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(true);
+  const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(true);
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>(
     []
   );
@@ -91,8 +94,22 @@ export default function Page() {
   const [buildPrompt, setBuildPrompt] = useState<string | null>(null);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [codingAgentPanelPosition, setCodingAgentPanelPosition] = useState({
+    x: 100,
+    y: 100,
+  });
 
-  const addAgentThought = (agentId: string, content: string) => {
+  // Interval-based processing state
+  const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
+  const [processingIntervalMs] = useState(30000); // 30 seconds
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Feature details panel state
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
+    null
+  );
+
+  const addAgentThought = useCallback((agentId: string, content: string) => {
     setAgents((prev) =>
       prev.map((agent) => {
         if (agent.id === agentId && agent.isEnabled) {
@@ -113,7 +130,7 @@ export default function Page() {
         return agent;
       })
     );
-  };
+  }, []);
 
   const handleMarkAsRead = (agentId: string) => {
     setAgents((prev) =>
@@ -133,98 +150,253 @@ export default function Page() {
     );
   };
 
-  const processAgentFeedback = useCallback(
-    async (text: string) => {
-      // We iterate through all enabled agents and ask them to "listen" to the transcript
-      agents.forEach(async (agent) => {
-        if (!agent.isEnabled) return;
-
-        const response = await generateAgentThoughts(
-          text,
-          agent.role,
-          agent.name
-        );
-
-        if (response.message) {
-          triggerAgentFeedback(agent.id, response.message);
-        }
-
-        if (response.thought) {
-          addAgentThought(agent.id, response.thought);
-        }
-      });
+  const handleDeleteDiaryEntry = useCallback(
+    (agentId: string, entryId: string) => {
+      setAgents((prev) =>
+        prev.map((agent) => {
+          if (agent.id === agentId) {
+            return {
+              ...agent,
+              diaryEntries: agent.diaryEntries.filter((e) => e.id !== entryId),
+            };
+          }
+          return agent;
+        })
+      );
     },
-    [agents]
+    []
   );
 
-  const triggerAgentFeedback = (agentId: string, message: string) => {
-    setAgents((prev) => {
-      const agent = prev.find((a) => a.id === agentId);
-      if (!agent || !agent.isEnabled) return prev;
+  const handleCrossOffDiaryEntry = useCallback(
+    (agentId: string, entryId: string) => {
+      setAgents((prev) =>
+        prev.map((agent) => {
+          if (agent.id === agentId) {
+            const entry = agent.diaryEntries.find((e) => e.id === entryId);
+            if (entry) {
+              return {
+                ...agent,
+                diaryEntries: agent.diaryEntries.filter(
+                  (e) => e.id !== entryId
+                ),
+                crossedOffEntries: [...agent.crossedOffEntries, entry],
+              };
+            }
+          }
+          return agent;
+        })
+      );
+    },
+    []
+  );
 
-      // If enabled, set active
-      return prev.map((a) => (a.id === agentId ? { ...a, isActive: true } : a));
-    });
+  const triggerAgentFeedback = useCallback(
+    (agentId: string, message: string) => {
+      setAgents((prev) => {
+        const agent = prev.find((a) => a.id === agentId);
+        if (!agent || !agent.isEnabled) return prev;
 
-    setAgents((prev) => {
-      const agent = prev.find((a) => a.id === agentId);
-      if (agent && agent.isEnabled) {
-        setActiveFeedback({ agentId, message });
-
-        // Auto-hide after 5s
-        setTimeout(() => {
-          setAgents((current) =>
-            current.map((a) =>
-              a.id === agentId ? { ...a, isActive: false } : a
-            )
-          );
-          setActiveFeedback((current) =>
-            current?.agentId === agentId ? null : current
-          );
-        }, 5000);
-
+        // If enabled, set active
         return prev.map((a) =>
           a.id === agentId ? { ...a, isActive: true } : a
         );
-      }
-      return prev;
-    });
-  };
+      });
 
-  const handleResult = useCallback(
-    async (text: string, isFinal: boolean) => {
-      if (!isFinal) {
-        // Update current session text with interim results (this replaces previous interim)
-        setCurrentSessionText(text);
+      setAgents((prev) => {
+        const agent = prev.find((a) => a.id === agentId);
+        if (agent && agent.isEnabled) {
+          setActiveFeedback({ agentId, message });
+
+          // Auto-hide after 5s
+          setTimeout(() => {
+            setAgents((current) =>
+              current.map((a) =>
+                a.id === agentId ? { ...a, isActive: false } : a
+              )
+            );
+            setActiveFeedback((current) =>
+              current?.agentId === agentId ? null : current
+            );
+          }, 5000);
+
+          return prev.map((a) =>
+            a.id === agentId ? { ...a, isActive: true } : a
+          );
+        }
+        return prev;
+      });
+    },
+    []
+  );
+
+  const processAgentFeedback = useCallback(
+    async (text: string) => {
+      // We iterate through all enabled agents and ask them to "listen" to the transcript
+      await Promise.all(
+        agents.map(async (agent) => {
+          if (!agent.isEnabled) return;
+
+          const response = await generateAgentThoughts(
+            text,
+            agent.role,
+            agent.name
+          );
+
+          if (response.message) {
+            triggerAgentFeedback(agent.id, response.message);
+          }
+
+          if (response.thought) {
+            addAgentThought(agent.id, response.thought);
+          }
+        })
+      );
+    },
+    [agents, addAgentThought, triggerAgentFeedback]
+  );
+
+  const processAccumulatedTranscript = useCallback(async () => {
+    if (transcriptBuffer.length === 0) return;
+
+    setIsAnalyzing(true);
+    try {
+      const accumulatedText = transcriptBuffer.join(' ');
+
+      // Analyze what type of content this is
+      const analysis = await analyzeTranscript(
+        accumulatedText,
+        groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          summary: g.summary || '',
+        }))
+      );
+
+      if (analysis.type === 'noise' && analysis.confidence > 0.85) {
+        // Only skip if it's VERY clearly noise with very high confidence
+        setTranscriptBuffer([]);
         return;
       }
 
-      if (isFinal && text.trim().length > 0) {
-        // Add final text to current session
-        setCurrentSessionText((prev) => {
-          const newText = prev ? `${prev} ${text.trim()}` : text.trim();
-          return newText;
-        });
+      // If low confidence or classified as noise but not confidently, try to extract as feature anyway
+      if (analysis.type === 'noise' || analysis.confidence < 0.6) {
+        analysis.type = 'feature';
+      }
 
-        // Add final text to full transcript
-        setFullTranscript((prev) => {
-          const finalText = text.trim();
-          // Append with space if there's existing text
-          return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
-        });
+      if (analysis.type === 'feature') {
+        // Extract feature details
+        const featureDetails = await extractFeatureDetails(
+          accumulatedText,
+          transcriptBuffer
+        );
 
-        // Classify what type of requirement this is
-        const classification = await classifyRequirement(text);
+        // Check if feature already exists (semantic matching)
+        const match = await findMatchingFeature(
+          accumulatedText,
+          groups.map((g) => ({
+            id: g.id,
+            name: g.name,
+            summary: g.summary || '',
+            keyCapabilities: g.keyCapabilities || [],
+          }))
+        );
 
-        if (classification.isRequirement) {
-          const title = await generateNodeTitle(text);
+        if (match.matchedGroupId && match.confidence >= 0.7) {
+          // Update existing feature group
+          setGroups((prev) =>
+            prev.map((g) => {
+              if (g.id === match.matchedGroupId) {
+                return {
+                  ...g,
+                  summary: featureDetails.summary || g.summary || '',
+                  userValue: featureDetails.userValue || g.userValue || '',
+                  keyCapabilities: [
+                    ...new Set([
+                      ...(g.keyCapabilities || []),
+                      ...featureDetails.keyCapabilities,
+                    ]),
+                  ],
+                  technicalApproach:
+                    featureDetails.technicalApproach || g.technicalApproach,
+                  openQuestions: [
+                    ...new Set([
+                      ...(g.openQuestions || []),
+                      ...featureDetails.openQuestions,
+                    ]),
+                  ],
+                  relatedFeatures: [
+                    ...new Set([
+                      ...(g.relatedFeatures || []),
+                      ...featureDetails.relatedFeatures,
+                    ]),
+                  ],
+                  conversationHistory: [
+                    ...(g.conversationHistory || []),
+                    {
+                      timestamp: new Date(),
+                      transcript: accumulatedText,
+                      insights: analysis.reasoning,
+                    },
+                  ],
+                };
+              }
+              return g;
+            })
+          );
+        } else {
+          // Create new feature group with randomized position to avoid stacking
+          const newGroupId = generateId();
+          const newGroup: NodeGroup = {
+            id: newGroupId,
+            name: featureDetails.name,
+            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            nodeIds: [],
+            centroid: {
+              x: 200 + Math.random() * 600,
+              y: 200 + Math.random() * 400,
+            },
+            summary: featureDetails.summary,
+            userValue: featureDetails.userValue,
+            keyCapabilities: featureDetails.keyCapabilities,
+            technicalApproach: featureDetails.technicalApproach,
+            openQuestions: featureDetails.openQuestions,
+            relatedFeatures: featureDetails.relatedFeatures,
+            conversationHistory: [
+              {
+                timestamp: new Date(),
+                transcript: accumulatedText,
+                insights: analysis.reasoning,
+              },
+            ],
+          };
+          setGroups((prev) => [...prev, newGroup]);
+        }
+      } else if (analysis.type === 'capability') {
+        // Find which feature this capability belongs to
+        const match = await findMatchingFeature(
+          accumulatedText,
+          groups.map((g) => ({
+            id: g.id,
+            name: g.name,
+            summary: g.summary || '',
+            keyCapabilities: g.keyCapabilities || [],
+          }))
+        );
 
+        if (match.matchedGroupId && match.confidence >= 0.7) {
+          // Extract capability details
+          const capabilityDetails = await extractCapabilityDetails(
+            accumulatedText
+          );
+
+          // Create new capability node
+          const newNodeId = generateId();
           const newNode: NodeData = {
-            id: generateId(),
-            title, // AI-generated title
-            content: text, // Full transcript preserved as context
-            type: classification.type, // AI-determined type: product, design, or technical
-            status: 'pending',
+            id: newNodeId,
+            title: capabilityDetails.title,
+            description: capabilityDetails.description,
+            groupId: match.matchedGroupId,
+            type: 'capability',
             x: 100 + Math.random() * 400,
             y: 100 + Math.random() * 300,
             width: 288,
@@ -232,12 +404,99 @@ export default function Page() {
           };
 
           setNodes((prev) => [...prev, newNode]);
-          processAgentFeedback(text);
+
+          // Add node to group
+          setGroups((prev) =>
+            prev.map((g) => {
+              if (g.id === match.matchedGroupId) {
+                return {
+                  ...g,
+                  nodeIds: [...g.nodeIds, newNode.id],
+                  conversationHistory: [
+                    ...(g.conversationHistory || []),
+                    {
+                      timestamp: new Date(),
+                      transcript: accumulatedText,
+                      insights: `Added capability: ${capabilityDetails.title}`,
+                    },
+                  ],
+                };
+              }
+              return g;
+            })
+          );
+
+          processAgentFeedback(accumulatedText);
+        } else {
+          // No matching feature - treat as new feature instead
+          const featureDetails = await extractFeatureDetails(
+            accumulatedText,
+            transcriptBuffer
+          );
+
+          const newGroup: NodeGroup = {
+            id: generateId(),
+            name: featureDetails.name,
+            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            nodeIds: [],
+            centroid: {
+              x: 200 + Math.random() * 600,
+              y: 200 + Math.random() * 400,
+            },
+            summary: featureDetails.summary,
+            userValue: featureDetails.userValue,
+            keyCapabilities: featureDetails.keyCapabilities,
+            technicalApproach: featureDetails.technicalApproach,
+            openQuestions: featureDetails.openQuestions,
+            relatedFeatures: featureDetails.relatedFeatures,
+            conversationHistory: [
+              {
+                timestamp: new Date(),
+                transcript: accumulatedText,
+                insights: analysis.reasoning,
+              },
+            ],
+          };
+          setGroups((prev) => [...prev, newGroup]);
         }
       }
-    },
-    [processAgentFeedback]
-  );
+
+      // Clear buffer
+      setTranscriptBuffer([]);
+    } catch (error) {
+      console.error('[v0] Error during transcript analysis:', error);
+      throw error;
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [transcriptBuffer, groups, processAgentFeedback]);
+
+  const handleResult = useCallback(async (text: string, isFinal: boolean) => {
+    if (!isFinal) {
+      // Update current session text with interim results (this replaces previous interim)
+      setCurrentSessionText(text);
+      return;
+    }
+
+    if (isFinal && text.trim().length > 0) {
+      const finalText = text.trim();
+
+      // Add final text to current session
+      setCurrentSessionText((prev) => {
+        const newText = prev ? `${prev} ${finalText}` : finalText;
+        return newText;
+      });
+
+      // Add final text to full transcript
+      setFullTranscript((prev) => {
+        // Append with space if there's existing text
+        return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
+      });
+
+      // Add to transcript buffer for interval processing
+      setTranscriptBuffer((prev) => [...prev, finalText]);
+    }
+  }, []);
 
   const {
     isListening,
@@ -249,8 +508,13 @@ export default function Page() {
     onResult: handleResult,
   });
 
-  const toggleRecording = useCallback(() => {
+  const toggleRecording = useCallback(async () => {
     if (isListening) {
+      // When stopping, process any remaining transcript in buffer
+      if (transcriptBuffer.length > 0) {
+        await processAccumulatedTranscript();
+      }
+
       // When stopping, create a new transcript entry if there's any text
       if (currentSessionText.trim()) {
         const newEntry: TranscriptEntry = {
@@ -270,7 +534,14 @@ export default function Page() {
       setCurrentSessionText('');
       startListening();
     }
-  }, [isListening, startListening, stopListening, currentSessionText]);
+  }, [
+    isListening,
+    startListening,
+    stopListening,
+    currentSessionText,
+    transcriptBuffer,
+    processAccumulatedTranscript,
+  ]);
 
   const handleDelete = useCallback(() => {
     if (selectedNodes.length === 0) return;
@@ -312,6 +583,66 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleRecording, handleDelete]);
 
+  // Interval-based transcript processing
+  useEffect(() => {
+    if (!isListening) return;
+
+    const intervalId = setInterval(() => {
+      processAccumulatedTranscript();
+    }, processingIntervalMs);
+
+    return () => clearInterval(intervalId);
+  }, [isListening, processingIntervalMs, processAccumulatedTranscript]);
+
+  // Staggered agent thinking intervals - consolidated and optimized
+  useEffect(() => {
+    if (!fullTranscript.trim()) return;
+
+    // Track last processed transcript length per agent
+    const lastProcessedLength = new Map<string, number>();
+    const agentIntervalMap = new Map([
+      ['Sarah', 30000], // 30 seconds
+      ['Steve', 40000], // 40 seconds
+      ['Mike', 45000], // 45 seconds
+      ['Alex', 60000], // 60 seconds
+    ]);
+
+    const intervalIds = agents
+      .filter((agent) => agent.isEnabled && agentIntervalMap.has(agent.name))
+      .map((agent) => {
+        const interval = agentIntervalMap.get(agent.name)!;
+        lastProcessedLength.set(agent.name, 0);
+
+        const intervalId = setInterval(async () => {
+          const currentLength = fullTranscript.trim().length;
+          const lastLength = lastProcessedLength.get(agent.name) || 0;
+
+          // Only process if transcript has meaningfully changed (at least 50 new characters)
+          if (currentLength === 0 || currentLength - lastLength < 50) {
+            return;
+          }
+
+          lastProcessedLength.set(agent.name, currentLength);
+
+          const response = await generateAgentThoughts(
+            fullTranscript,
+            agent.role,
+            agent.name
+          );
+
+          if (response.thought) {
+            addAgentThought(agent.id, response.thought);
+          }
+        }, interval);
+
+        return intervalId;
+      });
+
+    return () => {
+      intervalIds.forEach((id) => clearInterval(id));
+    };
+  }, [agents, fullTranscript, addAgentThought]);
+
   const handleNodeSelect = (id: string) => {
     setSelectedNodes((prev) =>
       prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
@@ -328,6 +659,7 @@ export default function Page() {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
 
+    // Update node positions for groups with nodes
     setNodes((prev) =>
       prev.map((node) => {
         if (group.nodeIds.includes(node.id)) {
@@ -336,6 +668,24 @@ export default function Page() {
         return node;
       })
     );
+
+    // Update centroid for empty groups
+    if (group.nodeIds.length === 0) {
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === groupId) {
+            return {
+              ...g,
+              centroid: {
+                x: g.centroid.x + dx,
+                y: g.centroid.y + dy,
+              },
+            };
+          }
+          return g;
+        })
+      );
+    }
   };
 
   const handleCanvasClick = () => {
@@ -363,7 +713,7 @@ export default function Page() {
       const prompt = await generateBuildPrompt(
         selectedNodesData.map((node) => ({
           title: node.title,
-          content: node.content,
+          content: node.description,
           type: node.type,
         }))
       );
@@ -382,10 +732,56 @@ export default function Page() {
     }, 3000);
   };
 
+  const handleSendFeatureToAgent = async (feature: NodeGroup) => {
+    const featureNodes = nodes.filter((node) =>
+      feature.nodeIds.includes(node.id)
+    );
+
+    if (featureNodes.length === 0) return;
+
+    // Update node statuses
+    setNodes((prev) =>
+      prev.map((node) =>
+        feature.nodeIds.includes(node.id)
+          ? { ...node, status: 'processing' }
+          : node
+      )
+    );
+
+    // Generate build prompt
+    try {
+      const prompt = await generateBuildPrompt(
+        featureNodes.map((node) => ({
+          title: node.title,
+          content: node.description,
+          type: node.type,
+        }))
+      );
+      setBuildPrompt(prompt);
+      setIsPromptDialogOpen(true);
+    } catch (error) {
+      console.error('Error generating build prompt:', error);
+    }
+
+    setTimeout(() => {
+      setNodes((prev) =>
+        prev.map((node) =>
+          feature.nodeIds.includes(node.id)
+            ? { ...node, status: 'coded' }
+            : node
+        )
+      );
+    }, 3000);
+  };
+
   const handleGroupRename = (groupId: string, newName: string) => {
     setGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, name: newName } : g))
     );
+  };
+
+  const handleGroupClick = (groupId: string) => {
+    setSelectedFeatureId(groupId);
   };
 
   const handleToggleAgent = (agentId: string) => {
@@ -407,12 +803,52 @@ export default function Page() {
   return (
     <main className='flex h-screen w-screen overflow-hidden bg-background text-foreground'>
       <div className='flex-1 relative'>
-        {isTranscriptPanelOpen && (
-          <TranscriptPanel
-            fullTranscript={fullTranscript}
-            currentSessionText={currentSessionText}
-            isRecording={isListening}
-          />
+        <TranscriptPanel
+          fullTranscript={fullTranscript}
+          currentSessionText={currentSessionText}
+          isRecording={isListening}
+          onManualAnalyze={processAccumulatedTranscript}
+          hasBufferedTranscript={transcriptBuffer.length > 0}
+          isAnalyzing={isAnalyzing}
+          isMinimized={!isTranscriptPanelOpen}
+          onToggleMinimize={() => setIsTranscriptPanelOpen((prev) => !prev)}
+        />
+
+        {/* FAB for Analyze button when transcript is minimized */}
+        {!isTranscriptPanelOpen && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className='fixed bottom-28 left-8 z-30'
+          >
+            <Button
+              onClick={processAccumulatedTranscript}
+              disabled={transcriptBuffer.length === 0 || isAnalyzing}
+              size='lg'
+              className='rounded-full shadow-2xl h-14 w-14 p-0 flex items-center justify-center'
+              variant={
+                transcriptBuffer.length > 0 && !isAnalyzing
+                  ? 'default'
+                  : 'outline'
+              }
+            >
+              {isAnalyzing ? (
+                <Loader2 className='h-6 w-6 animate-spin' />
+              ) : (
+                <Sparkles className='h-6 w-6' />
+              )}
+            </Button>
+            {transcriptBuffer.length > 0 && !isAnalyzing && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className='absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-popover border border-border rounded-lg px-3 py-2 shadow-lg whitespace-nowrap text-sm pointer-events-none'
+              >
+                Analyze transcript
+              </motion.div>
+            )}
+          </motion.div>
         )}
 
         <CanvasBoard
@@ -424,11 +860,30 @@ export default function Page() {
           onNodePositionUpdate={handleNodePositionUpdate}
           onGroupDrag={handleGroupDrag}
           onGroupRename={handleGroupRename}
+          onGroupClick={handleGroupClick}
           isRecording={isListening}
           onToggleRecording={toggleRecording}
           isTranscriptPanelOpen={isTranscriptPanelOpen}
           onToggleTranscriptPanel={() =>
             setIsTranscriptPanelOpen((prev) => !prev)
+          }
+          isAgentSidebarOpen={isAgentSidebarOpen}
+          codingAgentPanel={
+            isPromptDialogOpen ? (
+              <CodingAgentPanel
+                prompt={buildPrompt}
+                isGenerating={!buildPrompt}
+                onClose={() => setIsPromptDialogOpen(false)}
+                onCopy={handleCopyPrompt}
+                copied={promptCopied}
+                x={codingAgentPanelPosition.x}
+                y={codingAgentPanelPosition.y}
+                scale={1}
+                onPositionUpdate={(x, y) => {
+                  setCodingAgentPanelPosition({ x, y });
+                }}
+              />
+            ) : null
           }
         />
 
@@ -445,47 +900,18 @@ export default function Page() {
         activeFeedback={activeFeedback}
         onMarkAsRead={handleMarkAsRead}
         onToggleAgent={handleToggleAgent}
+        onDeleteDiaryEntry={handleDeleteDiaryEntry}
+        onCrossOffDiaryEntry={handleCrossOffDiaryEntry}
+        isMinimized={!isAgentSidebarOpen}
+        onToggleMinimize={() => setIsAgentSidebarOpen((prev) => !prev)}
       />
 
-      {/* Build Prompt Dialog */}
-      <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Build Prompt for Coding Agent</DialogTitle>
-            <DialogDescription>
-              Copy this prompt and hand it off to your coding agent to build the
-              selected requirements.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="bg-secondary/30 rounded-lg p-4 border border-border">
-              <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-foreground">
-                {buildPrompt || 'Generating prompt...'}
-              </pre>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleCopyPrompt}
-              className="flex items-center gap-2"
-            >
-              {promptCopied ? (
-                <>
-                  <Check size={16} />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={16} />
-                  Copy Prompt
-                </>
-              )}
-            </Button>
-            <Button onClick={() => setIsPromptDialogOpen(false)}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Feature Details Panel */}
+      <FeatureDetailsPanel
+        feature={groups.find((g) => g.id === selectedFeatureId) || null}
+        onClose={() => setSelectedFeatureId(null)}
+        onSendToAgent={handleSendFeatureToAgent}
+      />
     </main>
   );
 }

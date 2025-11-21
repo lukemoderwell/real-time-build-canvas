@@ -137,9 +137,16 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && (isListening || isStartingRef.current)) {
-      recognitionRef.current.stop()
+      try {
+        recognitionRef.current.stop()
+        // Also abort to immediately stop processing
+        recognitionRef.current.abort()
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error)
+      }
       setIsListening(false)
       isStartingRef.current = false
+      setTranscript("") // Clear interim transcript
     }
   }, [isListening])
 
