@@ -1,21 +1,16 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
 import { ControlBar } from '@/components/control-bar';
 import { StatusPanel } from '@/components/status-panel';
 import { FeatureDetailsPanel } from '@/components/feature-details-panel';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { CodingAgentPanel } from '@/components/coding-agent-panel';
 import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Sparkles, Loader2 } from 'lucide-react';
 import type { Agent, NodeData, NodeGroup, TranscriptEntry } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
@@ -90,6 +85,7 @@ export default function Page() {
     message: string;
   } | null>(null);
   const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(true);
+  const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(true);
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>(
     []
   );
@@ -98,6 +94,7 @@ export default function Page() {
   const [buildPrompt, setBuildPrompt] = useState<string | null>(null);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [codingAgentPanelPosition, setCodingAgentPanelPosition] = useState({ x: 100, y: 100 });
 
   // Interval-based processing state
   const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
@@ -106,6 +103,14 @@ export default function Page() {
 
   // Feature details panel state
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+
+  // Debug: Log when groups or nodes change
+  useEffect(() => {
+    console.log('[v0] 🎨 State updated - Groups:', groups.length, 'Nodes:', nodes.length);
+    if (groups.length > 0) {
+      console.log('[v0] Groups:', groups.map((g) => ({ id: g.id, name: g.name, nodeCount: g.nodeIds.length })));
+    }
+  }, [groups, nodes]);
 
   const addAgentThought = useCallback((agentId: string, content: string) => {
     console.log('[v0] Adding agent thought:', agentId, content);
@@ -242,44 +247,62 @@ export default function Page() {
   );
 
   const processAccumulatedTranscript = useCallback(async () => {
-    if (transcriptBuffer.length === 0) return;
+    if (transcriptBuffer.length === 0) {
+      console.log('[v0] No transcript buffer to process');
+      return;
+    }
 
+    console.log('[v0] ========== STARTING TRANSCRIPT ANALYSIS ==========');
     setIsAnalyzing(true);
     try {
       const accumulatedText = transcriptBuffer.join(' ');
       console.log('[v0] Processing accumulated transcript:', accumulatedText);
+      console.log('[v0] Transcript length:', accumulatedText.length, 'characters');
+      console.log('[v0] Existing groups:', groups.length);
 
     // Analyze what type of content this is
+    console.log('[v0] Step 1: Analyzing transcript type...');
     const analysis = await analyzeTranscript(
       accumulatedText,
       groups.map((g) => ({ id: g.id, name: g.name, summary: g.summary || '' }))
     );
 
-    console.log('[v0] Analysis result:', analysis);
+    console.log('[v0] Analysis result:', {
+      type: analysis.type,
+      confidence: analysis.confidence,
+      reasoning: analysis.reasoning
+    });
 
     if (analysis.type === 'noise' && analysis.confidence > 0.85) {
       // Only skip if it's VERY clearly noise with very high confidence
-      console.log('[v0] Skipping - very high confidence noise');
+      console.log('[v0] ❌ Skipping - very high confidence noise (confidence:', analysis.confidence, ')');
       setTranscriptBuffer([]);
       return;
     }
 
     // If low confidence or classified as noise but not confidently, try to extract as feature anyway
     if (analysis.type === 'noise' || analysis.confidence < 0.6) {
-      console.log('[v0] Low confidence or uncertain noise, attempting feature extraction anyway');
+      console.log('[v0] ⚠️ Low confidence (', analysis.confidence, ') or uncertain noise, attempting feature extraction anyway');
       analysis.type = 'feature';
     }
 
     if (analysis.type === 'feature') {
       // Extract feature details
+      console.log('[v0] Step 2: Extracting feature details...');
       const featureDetails = await extractFeatureDetails(
         accumulatedText,
         transcriptBuffer
       );
 
-      console.log('[v0] Creating/updating feature:', featureDetails.name);
+      console.log('[v0] ✅ Feature details extracted:', {
+        name: featureDetails.name,
+        summary: featureDetails.summary,
+        keyCapabilities: featureDetails.keyCapabilities,
+        openQuestions: featureDetails.openQuestions
+      });
 
       // Check if feature already exists (semantic matching)
+      console.log('[v0] Step 3: Checking for existing feature match...');
       const match = await findMatchingFeature(
         accumulatedText,
         groups.map((g) => ({
@@ -290,11 +313,19 @@ export default function Page() {
         }))
       );
 
+      console.log('[v0] Match result:', {
+        matchedGroupId: match.matchedGroupId,
+        confidence: match.confidence,
+        reasoning: match.reasoning
+      });
+
       if (match.matchedGroupId && match.confidence >= 0.7) {
         // Update existing feature group
         console.log(
-          '[v0] Updating existing feature:',
-          match.matchedGroupId
+          '[v0] ✅ Updating existing feature:',
+          match.matchedGroupId,
+          'with confidence:',
+          match.confidence
         );
         setGroups((prev) =>
           prev.map((g) => {
@@ -338,9 +369,10 @@ export default function Page() {
         );
       } else {
         // Create new feature group
-        console.log('[v0] Creating new feature group');
+        console.log('[v0] ✨ Creating NEW feature group');
+        const newGroupId = generateId();
         const newGroup: NodeGroup = {
-          id: generateId(),
+          id: newGroupId,
           name: featureDetails.name,
           color: `hsl(${Math.random() * 360}, 70%, 60%)`,
           nodeIds: [],
@@ -359,10 +391,21 @@ export default function Page() {
             },
           ],
         };
-        setGroups((prev) => [...prev, newGroup]);
+        console.log('[v0] New group created with ID:', newGroupId);
+        console.log('[v0] Group details:', {
+          name: newGroup.name,
+          summary: newGroup.summary,
+          keyCapabilities: newGroup.keyCapabilities
+        });
+        setGroups((prev) => {
+          console.log('[v0] Adding group to state. Previous groups:', prev.length);
+          return [...prev, newGroup];
+        });
       }
     } else if (analysis.type === 'capability') {
+      console.log('[v0] 📦 Handling CAPABILITY');
       // Find which feature this capability belongs to
+      console.log('[v0] Step 2: Finding matching feature for capability...');
       const match = await findMatchingFeature(
         accumulatedText,
         groups.map((g) => ({
@@ -373,22 +416,35 @@ export default function Page() {
         }))
       );
 
+      console.log('[v0] Capability match result:', {
+        matchedGroupId: match.matchedGroupId,
+        confidence: match.confidence,
+        reasoning: match.reasoning
+      });
+
       if (match.matchedGroupId && match.confidence >= 0.7) {
         // Extract capability details
+        console.log('[v0] Step 3: Extracting capability details...');
         const capabilityDetails = await extractCapabilityDetails(
           accumulatedText
         );
 
+        console.log('[v0] ✅ Capability details extracted:', {
+          title: capabilityDetails.title,
+          description: capabilityDetails.description
+        });
+
         console.log(
-          '[v0] Creating capability:',
+          '[v0] ✨ Creating capability node:',
           capabilityDetails.title,
           'for group:',
           match.matchedGroupId
         );
 
         // Create new capability node
+        const newNodeId = generateId();
         const newNode: NodeData = {
-          id: generateId(),
+          id: newNodeId,
           title: capabilityDetails.title,
           description: capabilityDetails.description,
           groupId: match.matchedGroupId,
@@ -399,7 +455,11 @@ export default function Page() {
           height: 160,
         };
 
-        setNodes((prev) => [...prev, newNode]);
+        console.log('[v0] New node created with ID:', newNodeId);
+        setNodes((prev) => {
+          console.log('[v0] Adding node to state. Previous nodes:', prev.length);
+          return [...prev, newNode];
+        });
 
         // Add node to group
         setGroups((prev) =>
@@ -458,7 +518,12 @@ export default function Page() {
     }
 
       // Clear buffer
+      console.log('[v0] ✅ Analysis complete. Clearing transcript buffer.');
       setTranscriptBuffer([]);
+      console.log('[v0] ========== TRANSCRIPT ANALYSIS COMPLETE ==========');
+    } catch (error) {
+      console.error('[v0] ❌ Error during transcript analysis:', error);
+      throw error;
     } finally {
       setIsAnalyzing(false);
     }
@@ -474,6 +539,7 @@ export default function Page() {
 
       if (isFinal && text.trim().length > 0) {
         const finalText = text.trim();
+        console.log('[v0] 🎤 Final transcript received:', finalText);
 
         // Add final text to current session
         setCurrentSessionText((prev) => {
@@ -488,7 +554,11 @@ export default function Page() {
         });
 
         // Add to transcript buffer for interval processing
-        setTranscriptBuffer((prev) => [...prev, finalText]);
+        setTranscriptBuffer((prev) => {
+          const newBuffer = [...prev, finalText];
+          console.log('[v0] 📝 Added to transcript buffer. Buffer size:', newBuffer.length, 'items');
+          return newBuffer;
+        });
       }
     },
     []
@@ -583,6 +653,95 @@ export default function Page() {
     return () => clearInterval(intervalId);
   }, [isListening, processingIntervalMs, processAccumulatedTranscript]);
 
+  // Staggered agent thinking intervals
+  // Sarah (designer) - thinks every 30 seconds
+  useEffect(() => {
+    const agent = agents.find((a) => a.name === 'Sarah');
+    if (!agent?.isEnabled || !fullTranscript.trim()) return;
+
+    const intervalId = setInterval(async () => {
+      if (!fullTranscript.trim()) return;
+
+      const response = await generateAgentThoughts(
+        fullTranscript,
+        agent.role,
+        agent.name
+      );
+
+      if (response.thought) {
+        addAgentThought(agent.id, response.thought);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [agents, fullTranscript, addAgentThought]);
+
+  // Mike (backend) - thinks every 45 seconds
+  useEffect(() => {
+    const agent = agents.find((a) => a.name === 'Mike');
+    if (!agent?.isEnabled || !fullTranscript.trim()) return;
+
+    const intervalId = setInterval(async () => {
+      if (!fullTranscript.trim()) return;
+
+      const response = await generateAgentThoughts(
+        fullTranscript,
+        agent.role,
+        agent.name
+      );
+
+      if (response.thought) {
+        addAgentThought(agent.id, response.thought);
+      }
+    }, 45000); // 45 seconds
+
+    return () => clearInterval(intervalId);
+  }, [agents, fullTranscript, addAgentThought]);
+
+  // Alex (cloud) - thinks every 60 seconds
+  useEffect(() => {
+    const agent = agents.find((a) => a.name === 'Alex');
+    if (!agent?.isEnabled || !fullTranscript.trim()) return;
+
+    const intervalId = setInterval(async () => {
+      if (!fullTranscript.trim()) return;
+
+      const response = await generateAgentThoughts(
+        fullTranscript,
+        agent.role,
+        agent.name
+      );
+
+      if (response.thought) {
+        addAgentThought(agent.id, response.thought);
+      }
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(intervalId);
+  }, [agents, fullTranscript, addAgentThought]);
+
+  // Steve (visionary) - thinks every 40 seconds
+  useEffect(() => {
+    const agent = agents.find((a) => a.name === 'Steve');
+    if (!agent?.isEnabled || !fullTranscript.trim()) return;
+
+    const intervalId = setInterval(async () => {
+      if (!fullTranscript.trim()) return;
+
+      const response = await generateAgentThoughts(
+        fullTranscript,
+        agent.role,
+        agent.name
+      );
+
+      if (response.thought) {
+        addAgentThought(agent.id, response.thought);
+      }
+    }, 40000); // 40 seconds
+
+    return () => clearInterval(intervalId);
+  }, [agents, fullTranscript, addAgentThought]);
+
   const handleNodeSelect = (id: string) => {
     setSelectedNodes((prev) =>
       prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
@@ -599,6 +758,7 @@ export default function Page() {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
 
+    // Update node positions for groups with nodes
     setNodes((prev) =>
       prev.map((node) => {
         if (group.nodeIds.includes(node.id)) {
@@ -607,6 +767,24 @@ export default function Page() {
         return node;
       })
     );
+
+    // Update centroid for empty groups
+    if (group.nodeIds.length === 0) {
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === groupId) {
+            return {
+              ...g,
+              centroid: {
+                x: g.centroid.x + dx,
+                y: g.centroid.y + dy,
+              },
+            };
+          }
+          return g;
+        })
+      );
+    }
   };
 
   const handleCanvasClick = () => {
@@ -634,7 +812,7 @@ export default function Page() {
       const prompt = await generateBuildPrompt(
         selectedNodesData.map((node) => ({
           title: node.title,
-          content: node.content,
+          content: node.description,
           type: node.type,
         }))
       );
@@ -648,6 +826,44 @@ export default function Page() {
       setNodes((prev) =>
         prev.map((node) =>
           selectedNodes.includes(node.id) ? { ...node, status: 'coded' } : node
+        )
+      );
+    }, 3000);
+  };
+
+  const handleSendFeatureToAgent = async (feature: NodeGroup) => {
+    const featureNodes = nodes.filter((node) => feature.nodeIds.includes(node.id));
+
+    if (featureNodes.length === 0) return;
+
+    // Update node statuses
+    setNodes((prev) =>
+      prev.map((node) =>
+        feature.nodeIds.includes(node.id)
+          ? { ...node, status: 'processing' }
+          : node
+      )
+    );
+
+    // Generate build prompt
+    try {
+      const prompt = await generateBuildPrompt(
+        featureNodes.map((node) => ({
+          title: node.title,
+          content: node.description,
+          type: node.type,
+        }))
+      );
+      setBuildPrompt(prompt);
+      setIsPromptDialogOpen(true);
+    } catch (error) {
+      console.error('Error generating build prompt:', error);
+    }
+
+    setTimeout(() => {
+      setNodes((prev) =>
+        prev.map((node) =>
+          feature.nodeIds.includes(node.id) ? { ...node, status: 'coded' } : node
         )
       );
     }, 3000);
@@ -682,15 +898,48 @@ export default function Page() {
   return (
     <main className='flex h-screen w-screen overflow-hidden bg-background text-foreground'>
       <div className='flex-1 relative'>
-        {isTranscriptPanelOpen && (
-          <TranscriptPanel
-            fullTranscript={fullTranscript}
-            currentSessionText={currentSessionText}
-            isRecording={isListening}
-            onManualAnalyze={processAccumulatedTranscript}
-            hasBufferedTranscript={transcriptBuffer.length > 0}
-            isAnalyzing={isAnalyzing}
-          />
+        <TranscriptPanel
+          fullTranscript={fullTranscript}
+          currentSessionText={currentSessionText}
+          isRecording={isListening}
+          onManualAnalyze={processAccumulatedTranscript}
+          hasBufferedTranscript={transcriptBuffer.length > 0}
+          isAnalyzing={isAnalyzing}
+          isMinimized={!isTranscriptPanelOpen}
+          onToggleMinimize={() => setIsTranscriptPanelOpen((prev) => !prev)}
+        />
+
+        {/* FAB for Analyze button when transcript is minimized */}
+        {!isTranscriptPanelOpen && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className='fixed bottom-28 left-8 z-30'
+          >
+            <Button
+              onClick={processAccumulatedTranscript}
+              disabled={transcriptBuffer.length === 0 || isAnalyzing}
+              size='lg'
+              className='rounded-full shadow-2xl h-14 w-14 p-0 flex items-center justify-center'
+              variant={transcriptBuffer.length > 0 && !isAnalyzing ? 'default' : 'outline'}
+            >
+              {isAnalyzing ? (
+                <Loader2 className='h-6 w-6 animate-spin' />
+              ) : (
+                <Sparkles className='h-6 w-6' />
+              )}
+            </Button>
+            {transcriptBuffer.length > 0 && !isAnalyzing && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className='absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-popover border border-border rounded-lg px-3 py-2 shadow-lg whitespace-nowrap text-sm pointer-events-none'
+              >
+                Analyze transcript
+              </motion.div>
+            )}
+          </motion.div>
         )}
 
         <CanvasBoard
@@ -709,6 +958,24 @@ export default function Page() {
           onToggleTranscriptPanel={() =>
             setIsTranscriptPanelOpen((prev) => !prev)
           }
+          isAgentSidebarOpen={isAgentSidebarOpen}
+          codingAgentPanel={
+            isPromptDialogOpen ? (
+              <CodingAgentPanel
+                prompt={buildPrompt}
+                isGenerating={!buildPrompt}
+                onClose={() => setIsPromptDialogOpen(false)}
+                onCopy={handleCopyPrompt}
+                copied={promptCopied}
+                x={codingAgentPanelPosition.x}
+                y={codingAgentPanelPosition.y}
+                scale={1}
+                onPositionUpdate={(x, y) => {
+                  setCodingAgentPanelPosition({ x, y });
+                }}
+              />
+            ) : null
+          }
         />
 
         <StatusPanel nodes={nodes} />
@@ -726,53 +993,17 @@ export default function Page() {
         onToggleAgent={handleToggleAgent}
         onDeleteDiaryEntry={handleDeleteDiaryEntry}
         onCrossOffDiaryEntry={handleCrossOffDiaryEntry}
+        isMinimized={!isAgentSidebarOpen}
+        onToggleMinimize={() => setIsAgentSidebarOpen((prev) => !prev)}
       />
 
       {/* Feature Details Panel */}
       <FeatureDetailsPanel
         feature={groups.find((g) => g.id === selectedFeatureId) || null}
         onClose={() => setSelectedFeatureId(null)}
+        onSendToAgent={handleSendFeatureToAgent}
       />
 
-      {/* Build Prompt Dialog */}
-      <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Build Prompt for Coding Agent</DialogTitle>
-            <DialogDescription>
-              Copy this prompt and hand it off to your coding agent to build the
-              selected requirements.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="bg-secondary/30 rounded-lg p-4 border border-border">
-              <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-foreground">
-                {buildPrompt || 'Generating prompt...'}
-              </pre>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleCopyPrompt}
-              className="flex items-center gap-2"
-            >
-              {promptCopied ? (
-                <>
-                  <Check size={16} />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={16} />
-                  Copy Prompt
-                </>
-              )}
-            </Button>
-            <Button onClick={() => setIsPromptDialogOpen(false)}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

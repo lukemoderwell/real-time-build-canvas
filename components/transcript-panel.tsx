@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import { Button } from './ui/button';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TranscriptPanelProps {
   fullTranscript: string;
@@ -12,6 +12,8 @@ interface TranscriptPanelProps {
   onManualAnalyze?: () => void;
   hasBufferedTranscript?: boolean;
   isAnalyzing?: boolean;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
 }
 
 export function TranscriptPanel({
@@ -21,6 +23,8 @@ export function TranscriptPanel({
   onManualAnalyze,
   hasBufferedTranscript = false,
   isAnalyzing = false,
+  isMinimized = false,
+  onToggleMinimize,
 }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -42,14 +46,22 @@ export function TranscriptPanel({
       ? (fullTranscript ? ' ' : '') + currentSessionText
       : '');
 
-  return (
-    <div className='w-80 h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute left-0 top-0 shadow-2xl'>
-      <div className='p-4 border-b border-border flex items-center justify-between'>
-        <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
-          Transcript
-        </h2>
+  if (isMinimized) {
+    return (
+      <div className='w-12 h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute left-0 top-0 shadow-2xl'>
+        <div className='p-4 border-b border-border flex items-center justify-center'>
+          {onToggleMinimize && (
+            <button
+              onClick={onToggleMinimize}
+              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              title='Expand transcript panel'
+            >
+              <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
         {isRecording && (
-          <div className='flex items-center gap-1.5'>
+          <div className='flex flex-col items-center gap-2 p-2'>
             <motion.div
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{
@@ -59,9 +71,43 @@ export function TranscriptPanel({
               }}
               className='w-2 h-2 bg-red-500 rounded-full'
             />
-            <span className='text-[10px] text-muted-foreground'>Recording</span>
           </div>
         )}
+      </div>
+    );
+  }
+
+  return (
+    <div className='w-80 h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute left-0 top-0 shadow-2xl'>
+      <div className='p-4 border-b border-border flex items-center justify-between'>
+        <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
+          Transcript
+        </h2>
+        <div className='flex items-center gap-2'>
+          {isRecording && (
+            <div className='flex items-center gap-1.5'>
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  repeat: Number.POSITIVE_INFINITY,
+                  duration: 1.5,
+                  ease: 'easeInOut',
+                }}
+                className='w-2 h-2 bg-red-500 rounded-full'
+              />
+              <span className='text-[10px] text-muted-foreground'>Recording</span>
+            </div>
+          )}
+          {onToggleMinimize && (
+            <button
+              onClick={onToggleMinimize}
+              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              title='Minimize transcript panel'
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div

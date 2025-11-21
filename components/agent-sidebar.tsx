@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import { Book, Clock, ChevronDown, Settings, X, Check } from 'lucide-react';
+import { Book, Clock, ChevronDown, Settings, X, Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -21,6 +21,8 @@ interface AgentSidebarProps {
   onToggleAgent: (agentId: string) => void;
   onDeleteDiaryEntry: (agentId: string, entryId: string) => void;
   onCrossOffDiaryEntry: (agentId: string, entryId: string) => void;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
 }
 
 export function AgentSidebar({
@@ -30,8 +32,28 @@ export function AgentSidebar({
   onToggleAgent,
   onDeleteDiaryEntry,
   onCrossOffDiaryEntry,
+  isMinimized = false,
+  onToggleMinimize,
 }: AgentSidebarProps) {
   const enabledAgents = agents.filter((a) => a.isEnabled);
+
+  if (isMinimized) {
+    return (
+      <div className='w-12 h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
+        <div className='p-4 border-b border-border flex items-center justify-center'>
+          {onToggleMinimize && (
+            <button
+              onClick={onToggleMinimize}
+              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              title='Expand agent sidebar'
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='w-80 h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
@@ -40,49 +62,60 @@ export function AgentSidebar({
           Expert Agents
         </h2>
 
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'>
-              <Settings size={14} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side='left' align='start' className='w-64 p-4 mr-2'>
-            <div className='space-y-4'>
-              <div className='space-y-2'>
-                <h4 className='font-medium leading-none'>Expert Agents</h4>
-                <p className='text-xs text-muted-foreground'>
-                  Configure which agents are active in the session.
-                </p>
-              </div>
-              <div className='space-y-3'>
-                {agents.map((agent) => (
-                  <div
-                    key={agent.id}
-                    className='flex items-center justify-between'
-                  >
-                    <div className='flex items-center gap-2'>
-                      <div
-                        className='w-2 h-2 rounded-full'
-                        style={{ backgroundColor: agent.color }}
+        <div className='flex items-center gap-2'>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'>
+                <Settings size={14} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side='left' align='start' className='w-64 p-4 mr-2'>
+              <div className='space-y-4'>
+                <div className='space-y-2'>
+                  <h4 className='font-medium leading-none'>Expert Agents</h4>
+                  <p className='text-xs text-muted-foreground'>
+                    Configure which agents are active in the session.
+                  </p>
+                </div>
+                <div className='space-y-3'>
+                  {agents.map((agent) => (
+                    <div
+                      key={agent.id}
+                      className='flex items-center justify-between'
+                    >
+                      <div className='flex items-center gap-2'>
+                        <div
+                          className='w-2 h-2 rounded-full'
+                          style={{ backgroundColor: agent.color }}
+                        />
+                        <Label
+                          htmlFor={`agent-${agent.id}`}
+                          className='text-sm font-medium cursor-pointer'
+                        >
+                          {agent.name}
+                        </Label>
+                      </div>
+                      <Switch
+                        id={`agent-${agent.id}`}
+                        checked={agent.isEnabled}
+                        onCheckedChange={() => onToggleAgent(agent.id)}
                       />
-                      <Label
-                        htmlFor={`agent-${agent.id}`}
-                        className='text-sm font-medium cursor-pointer'
-                      >
-                        {agent.name}
-                      </Label>
                     </div>
-                    <Switch
-                      id={`agent-${agent.id}`}
-                      checked={agent.isEnabled}
-                      onCheckedChange={() => onToggleAgent(agent.id)}
-                    />
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+          {onToggleMinimize && (
+            <button
+              onClick={onToggleMinimize}
+              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              title='Minimize agent sidebar'
+            >
+              <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className='flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar'>

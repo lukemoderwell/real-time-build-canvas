@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { X, Terminal } from 'lucide-react';
 import type { NodeGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,11 +10,13 @@ import { Separator } from '@/components/ui/separator';
 interface FeatureDetailsPanelProps {
   feature: NodeGroup | null;
   onClose: () => void;
+  onSendToAgent?: (feature: NodeGroup) => void;
 }
 
 export function FeatureDetailsPanel({
   feature,
   onClose,
+  onSendToAgent,
 }: FeatureDetailsPanelProps) {
   if (!feature) return null;
 
@@ -32,14 +34,26 @@ export function FeatureDetailsPanel({
             {feature.nodeIds.length} {feature.nodeIds.length === 1 ? 'capability' : 'capabilities'}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="ml-2 flex-shrink-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2 ml-2">
+          {onSendToAgent && (
+            <Button
+              onClick={() => onSendToAgent(feature)}
+              size="sm"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              <Terminal className="h-4 w-4" />
+              <span>Build</span>
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="flex-shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Content */}

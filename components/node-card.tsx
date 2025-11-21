@@ -61,13 +61,12 @@ export function NodeCard({
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, scale: 0.8, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={cn(
-        "absolute w-64 bg-card/95 border rounded-lg shadow-lg backdrop-blur-md transition-all duration-200 cursor-pointer group overflow-hidden",
-        isDragging && "cursor-grabbing z-20 shadow-2xl",
-        !isDragging && "cursor-grab",
+        "absolute w-64 bg-card/95 border rounded-lg shadow-lg backdrop-blur-md cursor-pointer group overflow-hidden",
+        isDragging && "cursor-grabbing z-20 shadow-2xl transition-none",
+        !isDragging && "cursor-grab transition-all duration-150",
         isSelected
           ? "border-primary ring-1 ring-primary shadow-primary/20 z-10"
           : groupColor
@@ -79,6 +78,7 @@ export function NodeCard({
         top: node.y,
         borderColor: groupColor || undefined,
         boxShadow: groupColor ? `0 0 15px ${groupColor}30` : undefined,
+        willChange: isDragging ? 'transform' : 'auto',
       }}
       onClick={(e) => {
         if (!isDragging) {
@@ -90,7 +90,7 @@ export function NodeCard({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      whileHover={{ y: isDragging ? 0 : -4 }}
+      whileHover={isDragging ? {} : { y: -4 }}
     >
       {/* Top border accent with group color */}
       {groupColor && <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: groupColor }} />}

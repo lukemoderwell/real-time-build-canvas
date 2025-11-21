@@ -31,6 +31,8 @@ interface CanvasBoardProps {
   onToggleRecording: () => void;
   isTranscriptPanelOpen: boolean;
   onToggleTranscriptPanel: () => void;
+  isAgentSidebarOpen: boolean;
+  codingAgentPanel?: React.ReactNode;
 }
 
 export function CanvasBoard({
@@ -47,6 +49,8 @@ export function CanvasBoard({
   onToggleRecording,
   isTranscriptPanelOpen,
   onToggleTranscriptPanel,
+  isAgentSidebarOpen,
+  codingAgentPanel,
 }: CanvasBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -141,7 +145,8 @@ export function CanvasBoard({
       ref={containerRef}
       className={cn(
         'h-full overflow-hidden bg-background relative cursor-crosshair transition-all duration-200',
-        isTranscriptPanelOpen ? 'ml-80' : 'ml-0'
+        isTranscriptPanelOpen ? 'ml-80' : 'ml-12',
+        isAgentSidebarOpen ? 'mr-80' : 'mr-12'
       )}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
@@ -160,32 +165,55 @@ export function CanvasBoard({
 
       {/* Canvas Content */}
       <div
-        className='absolute inset-0 origin-top-left transition-transform duration-75 ease-out'
+        className={cn(
+          'absolute inset-0 origin-top-left',
+          isDragging ? 'transition-none' : 'transition-transform duration-75 ease-out'
+        )}
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+          willChange: isDragging ? 'transform' : 'auto',
         }}
       >
         {groups.map((group) => {
           const groupNodes = nodes.filter((n) => group.nodeIds.includes(n.id));
-          if (groupNodes.length === 0) return null;
 
-          const minX = Math.min(...groupNodes.map((n) => n.x));
-          const minY = Math.min(...groupNodes.map((n) => n.y));
-          const maxX = Math.max(...groupNodes.map((n) => n.x + n.width));
-          const maxY = Math.max(...groupNodes.map((n) => n.y + n.height));
+          // Calculate bounds - use defaults for empty groups
+          let minX, minY, maxX, maxY, width, height;
+
+          if (groupNodes.length === 0) {
+            // Empty group - show at centroid position with default size
+            minX = group.centroid.x;
+            minY = group.centroid.y;
+            width = 250;
+            height = 150;
+          } else {
+            // Group has nodes - calculate bounds from nodes
+            minX = Math.min(...groupNodes.map((n) => n.x));
+            minY = Math.min(...groupNodes.map((n) => n.y));
+            maxX = Math.max(...groupNodes.map((n) => n.x + n.width));
+            maxY = Math.max(...groupNodes.map((n) => n.y + n.height));
+            width = maxX - minX + 40;
+            height = maxY - minY + 60;
+          }
+
+          const isBeingDragged = draggingGroup?.id === group.id;
 
           return (
             <div
               key={group.id}
-              className='absolute rounded-2xl border-2 border-dashed transition-all duration-500 group'
+              className={cn(
+                'absolute rounded-2xl border-2 border-dashed group',
+                isBeingDragged ? 'transition-none' : 'transition-all duration-200'
+              )}
               style={{
                 left: minX - 20,
                 top: minY - 40,
-                width: maxX - minX + 40,
-                height: maxY - minY + 60,
+                width,
+                height,
                 borderColor: group.color,
                 backgroundColor: `${group.color}05`,
                 pointerEvents: 'none', // Allow clicking through to canvas, but enable for children
+                willChange: isBeingDragged ? 'transform' : 'auto',
               }}
             >
               <div className='absolute -top-6 left-4 flex items-center gap-2 pointer-events-auto'>
@@ -233,6 +261,23 @@ export function CanvasBoard({
                   </div>
                 )}
               </div>
+
+              {/* Empty group placeholder */}
+              {groupNodes.length === 0 && (
+                <div
+                  className='absolute inset-0 flex items-center justify-center pointer-events-auto cursor-pointer'
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setLastMousePos({ x: e.clientX, y: e.clientY });
+                    setDraggingGroup({ id: group.id, hasMoved: false });
+                  }}
+                >
+                  <div className='text-xs text-muted-foreground text-center px-4'>
+                    <div className='font-medium mb-1'>Feature created</div>
+                    <div className='text-[10px]'>Click to view details</div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -248,6 +293,9 @@ export function CanvasBoard({
             groupColor={getNodeGroupColor(node.id)}
           />
         ))}
+
+        {/* Coding Agent Panel */}
+        {codingAgentPanel}
       </div>
 
       {/* Controls Overlay */}
