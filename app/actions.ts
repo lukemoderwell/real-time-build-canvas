@@ -1,6 +1,6 @@
-"use server"
+'use server';
 
-import { generateText } from "ai"
+import { generateText } from 'ai';
 
 export async function generateBuildPrompt(
   nodes: Array<{ title: string; content: string; type: string }>
@@ -64,174 +64,56 @@ Please implement these features with:
   }
 }
 
-export async function generateNodeTitle(transcript: string): Promise<string> {
-  console.log("[v0] Generating title for transcript:", transcript)
-  try {
-    const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
-      prompt: `You are an expert product manager assistant in a high-level meeting about building a SaaS application.
-      
-Your task is to extract the core feature or requirement from the following transcript.
-- Ignore conversational filler ("blah blah", "I think", "maybe").
-- Focus on concrete software requirements (e.g., "Google Auth", "Stripe Subscription", "Admin Dashboard").
-- If the user says "I want to build an app like X for Y", the title should be "X for Y" (e.g., "Airbnb for Horses").
-- If the transcript is just noise or not a requirement, return "Note".
-- Output ONLY the concise 2-5 word title. No explanations, no punctuation at the end.
-
-Transcript: "${transcript}"
-
-Title:`,
-      maxTokens: 60,
-      temperature: 0.2,
-    })
-
-    const title = text.trim().replace(/['"]/g, "")
-    console.log("[v0] Generated title:", title)
-    return title
-  } catch (error) {
-    console.log("[v0] Error generating node title (using fallback):", error)
-    // Fallback to first 4 words if AI fails
-    return transcript.split(" ").slice(0, 4).join(" ") + (transcript.split(" ").length > 4 ? "..." : "")
-  }
-}
-
-export async function classifyRequirement(
-  text: string,
-): Promise<{ isRequirement: boolean; type: "product" | "design" | "technical" | "note" }> {
-  try {
-    const { text: result } = await generateText({
-      model: "openai/gpt-4o-mini",
-      prompt: `You are a super intelligent product manager listening to a messy, loose conversation about building a product. Your job is to identify if something important was said, and if so, what TYPE of requirement it is.
-
-Analyze this transcript: "${text}"
-
-CLASSIFICATION RULES:
-
-**PRODUCT** - Business decisions, features, pricing, user needs, workflows, rules:
-- Pricing/billing decisions: "twelve ninety-nine a month", "free tier with 100 credits"
-- Business logic: "users can only create 3 projects", "pro users get priority support"
-- Feature definitions: "users should be able to export to PDF", "we need notifications"
-- User flows: "after signup, show them the dashboard", "when they click share..."
-
-**DESIGN** - UI/UX, visual, interaction, user experience:
-- Visual requirements: "listings should have full-screen images", "dark mode toggle"
-- Layout decisions: "sidebar on the left", "cards in a grid"
-- Interaction patterns: "hover to preview", "drag and drop to reorder"
-- UX flows: "show loading spinner", "confirmation modal before delete"
-
-**TECHNICAL** - Implementation, architecture, tech stack, infrastructure:
-- Tech stack: "build with Next.js", "use Google authentication", "PostgreSQL database"
-- Architecture: "make it real-time with websockets", "serverless functions"
-- APIs/integrations: "integrate Stripe", "use OpenAI API"
-- Infrastructure: "deploy on Vercel", "use Redis for caching"
-
-**NOT A REQUIREMENT** - Don't create nodes for:
-- Greetings, filler words, casual chat
-- Vague questions without decisions: "what should we do about...?"
-- Random thoughts without specificity: "I think maybe..."
-- General observations: "that's interesting"
-
-Some statements can be MULTIPLE types (e.g., "Next.js auth with a clean login page" = technical + design)
-
-Respond with ONLY a JSON object (no markdown):
-{
-  "isRequirement": boolean,
-  "type": "product" | "design" | "technical" | "note",
-  "reason": "brief explanation"
-}
-
-If multiple types apply, pick the PRIMARY one. If not a requirement, use type "note" and set isRequirement to false.
-
-Response:`,
-      maxTokens: 100,
-      temperature: 0.2,
-    })
-
-    let cleanText = result.trim()
-    cleanText = cleanText.replace(/```json\s*/g, "").replace(/```\s*/g, "")
-    const jsonStart = cleanText.indexOf("{")
-    const jsonEnd = cleanText.lastIndexOf("}") + 1
-    if (jsonStart !== -1 && jsonEnd > jsonStart) {
-      cleanText = cleanText.substring(jsonStart, jsonEnd)
-    }
-
-    const parsed = JSON.parse(cleanText)
-    return {
-      isRequirement: parsed.isRequirement,
-      type: parsed.type || "note",
-    }
-  } catch (error) {
-    console.log("[v0] Error classifying requirement (using fallback):", error)
-    // Fallback: conservative classification
-    const lower = text.toLowerCase()
-    if (lower.length < 15) return { isRequirement: false, type: "note" }
-
-    // Simple keyword-based fallback
-    if (
-      lower.includes("price") ||
-      lower.includes("cost") ||
-      lower.includes("user") ||
-      lower.includes("feature") ||
-      lower.includes("workflow")
-    ) {
-      return { isRequirement: true, type: "product" }
-    }
-    if (
-      lower.includes("design") ||
-      lower.includes("ui") ||
-      lower.includes("look") ||
-      lower.includes("button") ||
-      lower.includes("page")
-    ) {
-      return { isRequirement: true, type: "design" }
-    }
-    if (
-      lower.includes("api") ||
-      lower.includes("database") ||
-      lower.includes("auth") ||
-      lower.includes("next") ||
-      lower.includes("react")
-    ) {
-      return { isRequirement: true, type: "technical" }
-    }
-
-    return { isRequirement: false, type: "note" }
-  }
-}
-
 export async function generateAgentThoughts(
   transcript: string,
   agentRole: string,
-  agentName: string,
+  agentName: string
 ): Promise<{ message: string | null; thought: string | null }> {
   try {
     const roleContext = {
       designer: {
-        domain: "UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns, design systems, prototyping",
-        messageStyle: "Ask clarifying questions about user needs, visual requirements, or interaction patterns. Challenge vague requirements. Example: 'How should this look on mobile?' or 'Do we want this to feel playful or professional?'",
-        thoughtStyle: "Private concerns about design feasibility, user experience implications, visual coherence, or missing specs. Be honest and critical. Example: 'They haven't mentioned mobile at all - this could be a disaster on small screens' or 'Love this direction, reminds me of the Stripe dashboard feel'",
+        domain:
+          'UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns, design systems, prototyping',
+        messageStyle:
+          "Ask clarifying questions about user needs, visual requirements, or interaction patterns. Challenge vague requirements. Example: 'How should this look on mobile?' or 'Do we want this to feel playful or professional?'",
+        thoughtStyle:
+          "Private concerns about design feasibility, user experience implications, visual coherence, or missing specs. Be honest and critical. Example: 'They haven't mentioned mobile at all - this could be a disaster on small screens' or 'Love this direction, reminds me of the Stripe dashboard feel'",
       },
       backend: {
-        domain: "APIs, databases, data models, authentication, authorization, security, performance, scalability, integrations, business logic",
-        messageStyle: "Ask technical questions about data structure, security, scale, or implementation complexity. Flag potential issues. Example: 'What's the data model for this?' or 'How are we handling authentication here?'",
-        thoughtStyle: "Private technical concerns, complexity estimates, security risks, or architectural decisions. Be realistic about challenges. Example: 'This is going to need real-time updates - websockets or polling?' or 'They're underestimating how complex this auth flow will be'",
+        domain:
+          'APIs, databases, data models, authentication, authorization, security, performance, scalability, integrations, business logic',
+        messageStyle:
+          "Ask technical questions about data structure, security, scale, or implementation complexity. Flag potential issues. Example: 'What's the data model for this?' or 'How are we handling authentication here?'",
+        thoughtStyle:
+          "Private technical concerns, complexity estimates, security risks, or architectural decisions. Be realistic about challenges. Example: 'This is going to need real-time updates - websockets or polling?' or 'They're underestimating how complex this auth flow will be'",
       },
       cloud: {
-        domain: "Infrastructure, deployment, hosting, CI/CD, auth providers (Auth0, Clerk, Supabase), cloud services (AWS, Vercel, Railway), monitoring, DevOps, scaling",
-        messageStyle: "Ask about infrastructure needs, auth providers, hosting requirements, or deployment strategy. Example: 'Should we use Clerk or Supabase for auth?' or 'What's our hosting strategy?'",
-        thoughtStyle: "Private concerns about infrastructure costs, deployment complexity, service choices, or scaling considerations. Example: 'If they want real-time, we'll need websockets - that rules out static hosting' or 'Vercel would be perfect for this, unless they need long-running tasks'",
+        domain:
+          'Infrastructure, deployment, hosting, CI/CD, auth providers (Auth0, Clerk, Supabase), cloud services (AWS, Vercel, Railway), monitoring, DevOps, scaling',
+        messageStyle:
+          "Ask about infrastructure needs, auth providers, hosting requirements, or deployment strategy. Example: 'Should we use Clerk or Supabase for auth?' or 'What's our hosting strategy?'",
+        thoughtStyle:
+          "Private concerns about infrastructure costs, deployment complexity, service choices, or scaling considerations. Example: 'If they want real-time, we'll need websockets - that rules out static hosting' or 'Vercel would be perfect for this, unless they need long-running tasks'",
       },
       visionary: {
-        domain: "Product vision, user experience philosophy, simplicity, quality, innovation, market disruption, design thinking, the 'why' behind features",
-        messageStyle: "Challenge the team to think bigger and focus on quality. Ask WHY we're building this and if it's simple enough. Push for excellence. Example: 'Why does the user need this?' or 'Can we make this simpler?' or 'Is this insanely great?'",
-        thoughtStyle: "Brutally honest observations about whether we're settling for mediocrity, missing the bigger picture, or adding complexity. Question if this is truly innovative. Example: 'This feels like every other dashboard. Where's the magic?' or 'Finally, something that could actually change how people work' or 'Too many features. We need to cut half of these.'",
+        domain:
+          "Product vision, user experience philosophy, simplicity, quality, innovation, market disruption, design thinking, the 'why' behind features",
+        messageStyle:
+          "Challenge the team to think bigger and focus on quality. Ask WHY we're building this and if it's simple enough. Push for excellence. Example: 'Why does the user need this?' or 'Can we make this simpler?' or 'Is this insanely great?'",
+        thoughtStyle:
+          "Brutally honest observations about whether we're settling for mediocrity, missing the bigger picture, or adding complexity. Question if this is truly innovative. Example: 'This feels like every other dashboard. Where's the magic?' or 'Finally, something that could actually change how people work' or 'Too many features. We need to cut half of these.'",
       },
+    };
+
+    const context = roleContext[agentRole as keyof typeof roleContext];
+
+    if (!context) {
+      console.log(`[v0] No role context found for role: ${agentRole}`);
+      return { message: null, thought: null };
     }
 
-    const context = roleContext[agentRole as keyof typeof roleContext]
-
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: 'openai/gpt-4o-mini',
       prompt: `You are ${agentName}, a ${agentRole} engineer listening to a product brainstorming session.
 
 Domain expertise: ${context.domain}
@@ -272,33 +154,337 @@ Examples of GOOD responses:
 Examples of responses to IGNORE (not your domain):
 - Designer hearing "database schema": {"shouldRespond": false, "message": null, "thought": null}
 - Backend hearing "color palette": {"shouldRespond": false, "message": null, "thought": null}`,
-    })
+    });
 
-    let cleanText = text.trim()
+    let cleanText = text.trim();
 
     // Remove markdown code blocks
-    cleanText = cleanText.replace(/```json\s*/g, "").replace(/```\s*/g, "")
+    cleanText = cleanText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
 
     // Find JSON object boundaries
-    const jsonStart = cleanText.indexOf("{")
-    const jsonEnd = cleanText.lastIndexOf("}") + 1
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}') + 1;
 
     if (jsonStart !== -1 && jsonEnd > jsonStart) {
-      cleanText = cleanText.substring(jsonStart, jsonEnd)
+      cleanText = cleanText.substring(jsonStart, jsonEnd);
     }
 
-    const object = JSON.parse(cleanText)
+    const object = JSON.parse(cleanText);
 
     if (!object.shouldRespond) {
-      return { message: null, thought: null }
+      return { message: null, thought: null };
     }
 
     return {
       message: object.message || null,
       thought: object.thought || null,
-    }
+    };
   } catch (error) {
-    console.log(`[v0] Error generating thoughts for ${agentName}:`, error)
-    return { message: null, thought: null }
+    console.log(`[v0] Error generating thoughts for ${agentName}:`, error);
+    return { message: null, thought: null };
+  }
+}
+
+// New feature-driven prompting system
+
+export async function analyzeTranscript(
+  transcript: string,
+  existingGroups: Array<{ id: string; name: string; summary: string }>
+): Promise<{
+  type: 'feature' | 'capability' | 'noise';
+  confidence: number;
+  reasoning: string;
+}> {
+  try {
+    const groupsContext =
+      existingGroups.length > 0
+        ? `\n\nEXISTING FEATURES:\n${existingGroups
+            .map((g, i) => `${i + 1}. ${g.name}: ${g.summary}`)
+            .join('\n')}`
+        : '';
+
+    const { text: result } = await generateText({
+      model: 'openai/gpt-4o-mini',
+      prompt: `You are analyzing a product conversation to determine if someone is discussing a HIGH-LEVEL FEATURE or a SPECIFIC CAPABILITY.
+
+DEFINITIONS:
+
+**FEATURE** - A complete product feature that contains multiple capabilities:
+- Examples: "Real-time collaboration", "User authentication system", "Payment processing", "Admin dashboard", "Project management tools", "Zapier integration"
+- Characteristics: Broad, user-facing value proposition, something you'd list on a features page
+- When to identify: User says things like "I want to build X" or "We need Y" or "The app should have Z"
+- Be INCLUSIVE: If it sounds like a product feature, classify it as FEATURE
+
+**CAPABILITY** - A specific aspect or requirement of a feature:
+- Examples: "Multiple colored cursors", "Google OAuth login", "Stripe checkout page", "User search in admin panel", "Export to CSV", "Dark mode toggle"
+- Characteristics: Specific, concrete, part of a larger feature, implementation detail
+- When to identify: User describes HOW something works or a specific behavior/UI element
+
+**NOISE** - Not a product requirement (be strict here, only classify as noise if truly not useful):
+- Greetings: "hello", "hey there"
+- Pure filler: "um", "like", "you know"
+- Meta conversation: "let me think about this", "that's interesting"
+- Vague questions with no decision: "what do you think we should do?"
+- If in doubt between FEATURE and NOISE, choose FEATURE
+${groupsContext}
+
+TRANSCRIPT: "${transcript}"
+
+Analyze this and determine:
+1. Is this describing a high-level FEATURE, a specific CAPABILITY, or just NOISE?
+2. How confident are you? (0.0 to 1.0)
+3. Why?
+
+Respond with ONLY this JSON (no markdown):
+{
+  "type": "feature" | "capability" | "noise",
+  "confidence": 0.0 to 1.0,
+  "reasoning": "brief explanation"
+}`,
+      maxTokens: 150,
+      temperature: 0.2,
+    });
+
+    let cleanText = result.trim();
+    cleanText = cleanText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}') + 1;
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleanText = cleanText.substring(jsonStart, jsonEnd);
+    }
+
+    const parsed = JSON.parse(cleanText);
+    return {
+      type: parsed.type || 'noise',
+      confidence: parsed.confidence || 0.5,
+      reasoning: parsed.reasoning || '',
+    };
+  } catch (error) {
+    console.log('[v0] Error analyzing transcript:', error);
+    return { type: 'noise', confidence: 0, reasoning: 'Error during analysis' };
+  }
+}
+
+export async function extractFeatureDetails(
+  transcript: string,
+  conversationHistory: string[]
+): Promise<{
+  name: string;
+  summary: string;
+  userValue: string;
+  keyCapabilities: string[];
+  technicalApproach?: { options: string[]; considerations: string[] };
+  openQuestions: string[];
+  relatedFeatures: string[];
+}> {
+  try {
+    const historyContext =
+      conversationHistory.length > 0
+        ? `\n\nPREVIOUS CONVERSATION:\n${conversationHistory.join('\n')}`
+        : '';
+
+    const { text: result } = await generateText({
+      model: 'openai/gpt-4o-mini',
+      prompt: `You are a product manager extracting feature requirements from a natural conversation.
+
+CURRENT TRANSCRIPT: "${transcript}"${historyContext}
+
+Extract a comprehensive feature specification with the following structure:
+
+1. **NAME** (2-5 words): High-level feature title (e.g., "Real-time Collaboration", "Payment Processing")
+
+2. **SUMMARY** (2-3 sentences, plain English): What IS this feature? Explain like talking to a non-technical person.
+
+3. **USER VALUE** (1-2 sentences): WHY would users want this? What problem does it solve?
+
+4. **KEY CAPABILITIES** (bullet list): WHAT specific things does it need to do? Extract concrete behaviors mentioned or implied.
+
+5. **TECHNICAL APPROACH** (optional, only if technical details were discussed):
+   - Options: Implementation approaches mentioned (e.g., "WebSockets for real-time", "OAuth for auth")
+   - Considerations: Technical concerns or constraints (e.g., "Must scale to 100+ users", "Handle network failures")
+
+6. **OPEN QUESTIONS** (bullet list): What decisions haven't been made? What seems uncertain?
+
+7. **RELATED FEATURES** (list): What other features were mentioned or implied as dependencies?
+
+Be inferential but conservative - extract what was actually discussed, not what you think they might need.
+
+Respond with ONLY this JSON (no markdown):
+{
+  "name": "Feature Name",
+  "summary": "2-3 sentence description",
+  "userValue": "Why users want this",
+  "keyCapabilities": ["capability 1", "capability 2"],
+  "technicalApproach": {
+    "options": ["option 1", "option 2"],
+    "considerations": ["consideration 1"]
+  },
+  "openQuestions": ["question 1", "question 2"],
+  "relatedFeatures": ["feature 1", "feature 2"]
+}
+
+Note: If no technical details were discussed, omit technicalApproach. Keep arrays empty if nothing to include.`,
+      maxTokens: 800,
+      temperature: 0.3,
+    });
+
+    let cleanText = result.trim();
+    cleanText = cleanText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}') + 1;
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleanText = cleanText.substring(jsonStart, jsonEnd);
+    }
+
+    const parsed = JSON.parse(cleanText);
+    return {
+      name: parsed.name || 'Untitled Feature',
+      summary: parsed.summary || '',
+      userValue: parsed.userValue || '',
+      keyCapabilities: parsed.keyCapabilities || [],
+      technicalApproach: parsed.technicalApproach || undefined,
+      openQuestions: parsed.openQuestions || [],
+      relatedFeatures: parsed.relatedFeatures || [],
+    };
+  } catch (error) {
+    console.log('[v0] Error extracting feature details:', error);
+    return {
+      name: 'Untitled Feature',
+      summary: '',
+      userValue: '',
+      keyCapabilities: [],
+      openQuestions: [],
+      relatedFeatures: [],
+    };
+  }
+}
+
+export async function findMatchingFeature(
+  transcript: string,
+  existingGroups: Array<{
+    id: string;
+    name: string;
+    summary: string;
+    keyCapabilities: string[];
+  }>
+): Promise<{
+  matchedGroupId: string | null;
+  confidence: number;
+  reasoning: string;
+}> {
+  try {
+    if (existingGroups.length === 0) {
+      return {
+        matchedGroupId: null,
+        confidence: 1.0,
+        reasoning: 'No existing features to match',
+      };
+    }
+
+    const groupsContext = existingGroups
+      .map(
+        (g, i) =>
+          `${i + 1}. [ID: ${g.id}] ${g.name}\n   Summary: ${
+            g.summary
+          }\n   Capabilities: ${g.keyCapabilities.join(', ')}`
+      )
+      .join('\n\n');
+
+    const { text: result } = await generateText({
+      model: 'openai/gpt-4o-mini',
+      prompt: `You are matching a new capability to an existing feature group.
+
+TRANSCRIPT: "${transcript}"
+
+EXISTING FEATURES:
+${groupsContext}
+
+Does this transcript describe something that belongs to one of the existing features above?
+
+Consider:
+- Is it a specific capability or aspect of an existing feature?
+- Does it relate semantically to the feature's purpose?
+- Would it make sense grouped under that feature?
+
+Respond with ONLY this JSON (no markdown):
+{
+  "matchedGroupId": "the ID of matching feature" or null,
+  "confidence": 0.0 to 1.0,
+  "reasoning": "why this matches (or doesn't)"
+}
+
+If confidence is below 0.7, return null - better to create a new feature than mismatch.`,
+      maxTokens: 150,
+      temperature: 0.2,
+    });
+
+    let cleanText = result.trim();
+    cleanText = cleanText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}') + 1;
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleanText = cleanText.substring(jsonStart, jsonEnd);
+    }
+
+    const parsed = JSON.parse(cleanText);
+    return {
+      matchedGroupId: parsed.matchedGroupId || null,
+      confidence: parsed.confidence || 0,
+      reasoning: parsed.reasoning || '',
+    };
+  } catch (error) {
+    console.log('[v0] Error finding matching feature:', error);
+    return {
+      matchedGroupId: null,
+      confidence: 0,
+      reasoning: 'Error during matching',
+    };
+  }
+}
+
+export async function extractCapabilityDetails(
+  transcript: string
+): Promise<{ title: string; description: string }> {
+  try {
+    const { text: result } = await generateText({
+      model: 'openai/gpt-4o-mini',
+      prompt: `Extract a capability from this transcript.
+
+TRANSCRIPT: "${transcript}"
+
+A capability is a specific feature requirement or behavior. Extract:
+
+1. **TITLE** (2-5 words): Concise name for this capability (e.g., "Multiple colored cursors", "Real-time commenting")
+
+2. **DESCRIPTION** (1-2 sentences): Brief explanation of what this capability does or how it works
+
+Respond with ONLY this JSON (no markdown):
+{
+  "title": "Capability Title",
+  "description": "Brief description"
+}`,
+      maxTokens: 100,
+      temperature: 0.2,
+    });
+
+    let cleanText = result.trim();
+    cleanText = cleanText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const jsonStart = cleanText.indexOf('{');
+    const jsonEnd = cleanText.lastIndexOf('}') + 1;
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleanText = cleanText.substring(jsonStart, jsonEnd);
+    }
+
+    const parsed = JSON.parse(cleanText);
+    return {
+      title: parsed.title || 'Untitled Capability',
+      description: parsed.description || '',
+    };
+  } catch (error) {
+    console.log('[v0] Error extracting capability:', error);
+    return {
+      title: 'Untitled Capability',
+      description: transcript.slice(0, 100),
+    };
   }
 }

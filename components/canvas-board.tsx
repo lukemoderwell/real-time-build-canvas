@@ -26,6 +26,7 @@ interface CanvasBoardProps {
   groups: NodeGroup[];
   onGroupRename: (groupId: string, newName: string) => void;
   onGroupDrag: (groupId: string, dx: number, dy: number) => void;
+  onGroupClick: (groupId: string) => void;
   isRecording: boolean;
   onToggleRecording: () => void;
   isTranscriptPanelOpen: boolean;
@@ -41,6 +42,7 @@ export function CanvasBoard({
   groups,
   onGroupRename,
   onGroupDrag,
+  onGroupClick,
   isRecording,
   onToggleRecording,
   isTranscriptPanelOpen,
@@ -107,12 +109,8 @@ export function CanvasBoard({
   const handleMouseUp = () => {
     if (draggingGroup) {
       if (!draggingGroup.hasMoved) {
-        // It was a click, start renaming
-        const group = groups.find((g) => g.id === draggingGroup.id);
-        if (group) {
-          setEditingGroupId(group.id);
-          setEditingName(group.name);
-        }
+        // It was a click, open feature details
+        onGroupClick(draggingGroup.id);
       }
       setDraggingGroup(null);
     }

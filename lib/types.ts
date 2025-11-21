@@ -16,24 +16,31 @@ export interface Agent {
   isActive: boolean
   isEnabled: boolean
   diaryEntries: DiaryEntry[]
+  crossedOffEntries: DiaryEntry[]
   unreadCount: number
 }
 
 export interface NodeData {
   id: string
   title: string
-  content: string
-  type: "product" | "design" | "technical" | "note"
-  status: "pending" | "processing" | "coded" | "review"
+  description: string  // Brief 1-2 sentence description of the capability
+  groupId: string      // REQUIRED - every capability belongs to a feature
+  type: "capability"
   x: number
   y: number
-  groupId?: string
   width: number
   height: number
-  agentFeedback?: {
-    agentId: string
-    message: string
-  }[]
+}
+
+export interface ConversationEntry {
+  timestamp: Date
+  transcript: string
+  insights: string
+}
+
+export interface TechnicalApproach {
+  options: string[]
+  considerations: string[]
 }
 
 export interface NodeGroup {
@@ -42,6 +49,15 @@ export interface NodeGroup {
   color: string
   nodeIds: string[]
   centroid: { x: number; y: number }
+
+  // Rich feature details (optional for backward compatibility)
+  summary?: string                          // 2-3 sentence plain English description
+  userValue?: string                        // Why users want this feature
+  keyCapabilities?: string[]                // List of what it does
+  technicalApproach?: TechnicalApproach     // Implementation options and considerations
+  openQuestions?: string[]                  // Decisions that need to be made
+  relatedFeatures?: string[]                // Other features this connects to
+  conversationHistory?: ConversationEntry[] // All discussions about this feature
 }
 
 export interface CanvasState {

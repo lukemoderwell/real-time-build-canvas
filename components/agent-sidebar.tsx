@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import { Book, Clock, ChevronDown, Settings } from 'lucide-react';
+import { Book, Clock, ChevronDown, Settings, X, Check } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -19,6 +19,8 @@ interface AgentSidebarProps {
   activeFeedback: { agentId: string; message: string } | null;
   onMarkAsRead: (agentId: string) => void;
   onToggleAgent: (agentId: string) => void;
+  onDeleteDiaryEntry: (agentId: string, entryId: string) => void;
+  onCrossOffDiaryEntry: (agentId: string, entryId: string) => void;
 }
 
 export function AgentSidebar({
@@ -26,6 +28,8 @@ export function AgentSidebar({
   activeFeedback,
   onMarkAsRead,
   onToggleAgent,
+  onDeleteDiaryEntry,
+  onCrossOffDiaryEntry,
 }: AgentSidebarProps) {
   const enabledAgents = agents.filter((a) => a.isEnabled);
 
@@ -88,6 +92,8 @@ export function AgentSidebar({
             agent={agent}
             activeFeedback={activeFeedback}
             onMarkAsRead={onMarkAsRead}
+            onDeleteDiaryEntry={onDeleteDiaryEntry}
+            onCrossOffDiaryEntry={onCrossOffDiaryEntry}
           />
         ))}
       </div>
@@ -99,10 +105,14 @@ function AgentItem({
   agent,
   activeFeedback,
   onMarkAsRead,
+  onDeleteDiaryEntry,
+  onCrossOffDiaryEntry,
 }: {
   agent: Agent;
   activeFeedback: { agentId: string; message: string } | null;
   onMarkAsRead: (agentId: string) => void;
+  onDeleteDiaryEntry: (agentId: string, entryId: string) => void;
+  onCrossOffDiaryEntry: (agentId: string, entryId: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const Icon = Icons[agent.role as keyof typeof Icons] || Icons.product;
@@ -222,50 +232,125 @@ function AgentItem({
             className='overflow-hidden'
           >
             <div className='pt-1 pb-3 px-3 space-y-3 border-x border-b border-border/50 rounded-b-lg mx-1 bg-background/30'>
-              {agent.diaryEntries.length === 0 ? (
+              {agent.diaryEntries.length === 0 && agent.crossedOffEntries.length === 0 ? (
                 <div className='text-center py-4 text-muted-foreground text-xs'>
                   <Book className='w-4 h-4 mx-auto mb-2 opacity-20' />
                   <p>No thoughts yet.</p>
                 </div>
               ) : (
-                agent.diaryEntries
-                  .slice()
-                  .reverse()
-                  .map((entry) => (
-                    <div
-                      key={entry.id}
-                      className='flex items-start gap-2 group/entry'
-                    >
-                      <div
-                        className='w-5 h-5 rounded-full flex items-center justify-center border flex-shrink-0 mt-0.5'
-                        style={{
-                          backgroundColor: `${agent.color}1a`,
-                          borderColor: `${agent.color}33`,
-                          color: agent.color,
-                        }}
-                      >
-                        <Icon size={10} />
-                      </div>
-                      <div className='flex-1 min-w-0'>
-                        <div
-                          className='rounded-2xl rounded-tl-none px-3 py-2 inline-block max-w-full'
-                          style={{
-                            backgroundColor: `${agent.color}10`,
-                          }}
-                        >
-                          <p className='text-xs leading-relaxed text-foreground/90'>
-                            {entry.content}
-                          </p>
-                        </div>
-                        <div className='flex items-center gap-1 mt-1 ml-1 text-[9px] text-muted-foreground opacity-0 group-hover/entry:opacity-100 transition-opacity'>
-                          <Clock size={8} />
-                          <span>
-                            {new Date(entry.timestamp).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                <>
+                  {agent.diaryEntries.length > 0 && (
+                    <>
+                      {agent.diaryEntries
+                        .slice()
+                        .reverse()
+                        .map((entry) => (
+                          <div
+                            key={entry.id}
+                            className='flex items-start gap-2 group/entry'
+                          >
+                            <div
+                              className='w-5 h-5 rounded-full flex items-center justify-center border flex-shrink-0 mt-0.5'
+                              style={{
+                                backgroundColor: `${agent.color}1a`,
+                                borderColor: `${agent.color}33`,
+                                color: agent.color,
+                              }}
+                            >
+                              <Icon size={10} />
+                            </div>
+                            <div className='flex-1 min-w-0'>
+                              <div
+                                className='rounded-2xl rounded-tl-none px-3 py-2 inline-block max-w-full'
+                                style={{
+                                  backgroundColor: `${agent.color}10`,
+                                }}
+                              >
+                                <p className='text-xs leading-relaxed text-foreground/90'>
+                                  {entry.content}
+                                </p>
+                              </div>
+                              <div className='flex items-center gap-2 mt-1 ml-1'>
+                                <div className='flex items-center gap-1 text-[9px] text-muted-foreground opacity-0 group-hover/entry:opacity-100 transition-opacity'>
+                                  <Clock size={8} />
+                                  <span>
+                                    {new Date(entry.timestamp).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                                <div className='flex items-center gap-1 opacity-0 group-hover/entry:opacity-100 transition-opacity'>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onCrossOffDiaryEntry(agent.id, entry.id);
+                                    }}
+                                    className='p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors'
+                                    title='Cross off'
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteDiaryEntry(agent.id, entry.id);
+                                    }}
+                                    className='p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors'
+                                    title='Delete'
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </>
+                  )}
+                  {agent.crossedOffEntries.length > 0 && (
+                    <>
+                      {agent.diaryEntries.length > 0 && (
+                        <div className='border-t border-border/30 my-2' />
+                      )}
+                      {agent.crossedOffEntries
+                        .slice()
+                        .reverse()
+                        .map((entry) => (
+                          <div
+                            key={entry.id}
+                            className='flex items-start gap-2 opacity-60'
+                          >
+                            <div
+                              className='w-5 h-5 rounded-full flex items-center justify-center border flex-shrink-0 mt-0.5'
+                              style={{
+                                backgroundColor: `${agent.color}1a`,
+                                borderColor: `${agent.color}33`,
+                                color: agent.color,
+                              }}
+                            >
+                              <Icon size={10} />
+                            </div>
+                            <div className='flex-1 min-w-0'>
+                              <div
+                                className='rounded-2xl rounded-tl-none px-3 py-2 inline-block max-w-full line-through'
+                                style={{
+                                  backgroundColor: `${agent.color}10`,
+                                }}
+                              >
+                                <p className='text-xs leading-relaxed text-foreground/60'>
+                                  {entry.content}
+                                </p>
+                              </div>
+                              <div className='flex items-center gap-1 mt-1 ml-1 text-[9px] text-muted-foreground'>
+                                <Clock size={8} />
+                                <span>
+                                  {new Date(entry.timestamp).toLocaleTimeString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </>
+                  )}
+                </>
               )}
             </div>
           </motion.div>

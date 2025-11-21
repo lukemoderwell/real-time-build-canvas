@@ -6,6 +6,7 @@ import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
 import { ControlBar } from '@/components/control-bar';
 import { StatusPanel } from '@/components/status-panel';
+import { FeatureDetailsPanel } from '@/components/feature-details-panel';
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,12 @@ import type { Agent, NodeData, NodeGroup, TranscriptEntry } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import {
-  generateNodeTitle,
   generateAgentThoughts,
-  classifyRequirement,
   generateBuildPrompt,
+  analyzeTranscript,
+  extractFeatureDetails,
+  findMatchingFeature,
+  extractCapabilityDetails,
 } from './actions';
 
 // Mock Agents
@@ -36,39 +39,43 @@ const INITIAL_AGENTS: Agent[] = [
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '2',
     name: 'Mike',
-    role: 'backend engineer',
+    role: 'backend',
     avatar: '',
     color: '#3b82f6',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '3',
     name: 'Alex',
-    role: 'cloud architect',
+    role: 'cloud',
     avatar: '',
     color: '#f59e0b',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
   {
     id: '4',
     name: 'Steve',
-    role: 'visionary founder',
+    role: 'visionary',
     avatar: '',
     color: '#8b5cf6',
     isActive: false,
     isEnabled: true,
     diaryEntries: [],
+    crossedOffEntries: [],
     unreadCount: 0,
   },
 ];
@@ -92,7 +99,16 @@ export default function Page() {
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
 
-  const addAgentThought = (agentId: string, content: string) => {
+  // Interval-based processing state
+  const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
+  const [processingIntervalMs] = useState(30000); // 30 seconds
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Feature details panel state
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+
+  const addAgentThought = useCallback((agentId: string, content: string) => {
+    console.log('[v0] Adding agent thought:', agentId, content);
     setAgents((prev) =>
       prev.map((agent) => {
         if (agent.id === agentId && agent.isEnabled) {
@@ -113,7 +129,7 @@ export default function Page() {
         return agent;
       })
     );
-  };
+  }, []);
 
   const handleMarkAsRead = (agentId: string) => {
     setAgents((prev) =>
@@ -133,31 +149,39 @@ export default function Page() {
     );
   };
 
-  const processAgentFeedback = useCallback(
-    async (text: string) => {
-      // We iterate through all enabled agents and ask them to "listen" to the transcript
-      agents.forEach(async (agent) => {
-        if (!agent.isEnabled) return;
-
-        const response = await generateAgentThoughts(
-          text,
-          agent.role,
-          agent.name
-        );
-
-        if (response.message) {
-          triggerAgentFeedback(agent.id, response.message);
+  const handleDeleteDiaryEntry = useCallback((agentId: string, entryId: string) => {
+    setAgents((prev) =>
+      prev.map((agent) => {
+        if (agent.id === agentId) {
+          return {
+            ...agent,
+            diaryEntries: agent.diaryEntries.filter((e) => e.id !== entryId),
+          };
         }
+        return agent;
+      })
+    );
+  }, []);
 
-        if (response.thought) {
-          addAgentThought(agent.id, response.thought);
+  const handleCrossOffDiaryEntry = useCallback((agentId: string, entryId: string) => {
+    setAgents((prev) =>
+      prev.map((agent) => {
+        if (agent.id === agentId) {
+          const entry = agent.diaryEntries.find((e) => e.id === entryId);
+          if (entry) {
+            return {
+              ...agent,
+              diaryEntries: agent.diaryEntries.filter((e) => e.id !== entryId),
+              crossedOffEntries: [...agent.crossedOffEntries, entry],
+            };
+          }
         }
-      });
-    },
-    [agents]
-  );
+        return agent;
+      })
+    );
+  }, []);
 
-  const triggerAgentFeedback = (agentId: string, message: string) => {
+  const triggerAgentFeedback = useCallback((agentId: string, message: string) => {
     setAgents((prev) => {
       const agent = prev.find((a) => a.id === agentId);
       if (!agent || !agent.isEnabled) return prev;
@@ -189,7 +213,256 @@ export default function Page() {
       }
       return prev;
     });
-  };
+  }, []);
+
+  const processAgentFeedback = useCallback(
+    async (text: string) => {
+      // We iterate through all enabled agents and ask them to "listen" to the transcript
+      await Promise.all(
+        agents.map(async (agent) => {
+          if (!agent.isEnabled) return;
+
+          const response = await generateAgentThoughts(
+            text,
+            agent.role,
+            agent.name
+          );
+
+          if (response.message) {
+            triggerAgentFeedback(agent.id, response.message);
+          }
+
+          if (response.thought) {
+            addAgentThought(agent.id, response.thought);
+          }
+        })
+      );
+    },
+    [agents, addAgentThought, triggerAgentFeedback]
+  );
+
+  const processAccumulatedTranscript = useCallback(async () => {
+    if (transcriptBuffer.length === 0) return;
+
+    setIsAnalyzing(true);
+    try {
+      const accumulatedText = transcriptBuffer.join(' ');
+      console.log('[v0] Processing accumulated transcript:', accumulatedText);
+
+    // Analyze what type of content this is
+    const analysis = await analyzeTranscript(
+      accumulatedText,
+      groups.map((g) => ({ id: g.id, name: g.name, summary: g.summary || '' }))
+    );
+
+    console.log('[v0] Analysis result:', analysis);
+
+    if (analysis.type === 'noise' && analysis.confidence > 0.85) {
+      // Only skip if it's VERY clearly noise with very high confidence
+      console.log('[v0] Skipping - very high confidence noise');
+      setTranscriptBuffer([]);
+      return;
+    }
+
+    // If low confidence or classified as noise but not confidently, try to extract as feature anyway
+    if (analysis.type === 'noise' || analysis.confidence < 0.6) {
+      console.log('[v0] Low confidence or uncertain noise, attempting feature extraction anyway');
+      analysis.type = 'feature';
+    }
+
+    if (analysis.type === 'feature') {
+      // Extract feature details
+      const featureDetails = await extractFeatureDetails(
+        accumulatedText,
+        transcriptBuffer
+      );
+
+      console.log('[v0] Creating/updating feature:', featureDetails.name);
+
+      // Check if feature already exists (semantic matching)
+      const match = await findMatchingFeature(
+        accumulatedText,
+        groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          summary: g.summary || '',
+          keyCapabilities: g.keyCapabilities || [],
+        }))
+      );
+
+      if (match.matchedGroupId && match.confidence >= 0.7) {
+        // Update existing feature group
+        console.log(
+          '[v0] Updating existing feature:',
+          match.matchedGroupId
+        );
+        setGroups((prev) =>
+          prev.map((g) => {
+            if (g.id === match.matchedGroupId) {
+              return {
+                ...g,
+                summary: featureDetails.summary || g.summary || '',
+                userValue: featureDetails.userValue || g.userValue || '',
+                keyCapabilities: [
+                  ...new Set([
+                    ...(g.keyCapabilities || []),
+                    ...featureDetails.keyCapabilities,
+                  ]),
+                ],
+                technicalApproach:
+                  featureDetails.technicalApproach || g.technicalApproach,
+                openQuestions: [
+                  ...new Set([
+                    ...(g.openQuestions || []),
+                    ...featureDetails.openQuestions,
+                  ]),
+                ],
+                relatedFeatures: [
+                  ...new Set([
+                    ...(g.relatedFeatures || []),
+                    ...featureDetails.relatedFeatures,
+                  ]),
+                ],
+                conversationHistory: [
+                  ...(g.conversationHistory || []),
+                  {
+                    timestamp: new Date(),
+                    transcript: accumulatedText,
+                    insights: analysis.reasoning,
+                  },
+                ],
+              };
+            }
+            return g;
+          })
+        );
+      } else {
+        // Create new feature group
+        console.log('[v0] Creating new feature group');
+        const newGroup: NodeGroup = {
+          id: generateId(),
+          name: featureDetails.name,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+          nodeIds: [],
+          centroid: { x: 200, y: 200 },
+          summary: featureDetails.summary,
+          userValue: featureDetails.userValue,
+          keyCapabilities: featureDetails.keyCapabilities,
+          technicalApproach: featureDetails.technicalApproach,
+          openQuestions: featureDetails.openQuestions,
+          relatedFeatures: featureDetails.relatedFeatures,
+          conversationHistory: [
+            {
+              timestamp: new Date(),
+              transcript: accumulatedText,
+              insights: analysis.reasoning,
+            },
+          ],
+        };
+        setGroups((prev) => [...prev, newGroup]);
+      }
+    } else if (analysis.type === 'capability') {
+      // Find which feature this capability belongs to
+      const match = await findMatchingFeature(
+        accumulatedText,
+        groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          summary: g.summary || '',
+          keyCapabilities: g.keyCapabilities || [],
+        }))
+      );
+
+      if (match.matchedGroupId && match.confidence >= 0.7) {
+        // Extract capability details
+        const capabilityDetails = await extractCapabilityDetails(
+          accumulatedText
+        );
+
+        console.log(
+          '[v0] Creating capability:',
+          capabilityDetails.title,
+          'for group:',
+          match.matchedGroupId
+        );
+
+        // Create new capability node
+        const newNode: NodeData = {
+          id: generateId(),
+          title: capabilityDetails.title,
+          description: capabilityDetails.description,
+          groupId: match.matchedGroupId,
+          type: 'capability',
+          x: 100 + Math.random() * 400,
+          y: 100 + Math.random() * 300,
+          width: 288,
+          height: 160,
+        };
+
+        setNodes((prev) => [...prev, newNode]);
+
+        // Add node to group
+        setGroups((prev) =>
+          prev.map((g) => {
+            if (g.id === match.matchedGroupId) {
+              return {
+                ...g,
+                nodeIds: [...g.nodeIds, newNode.id],
+                conversationHistory: [
+                  ...(g.conversationHistory || []),
+                  {
+                    timestamp: new Date(),
+                    transcript: accumulatedText,
+                    insights: `Added capability: ${capabilityDetails.title}`,
+                  },
+                ],
+              };
+            }
+            return g;
+          })
+        );
+
+        processAgentFeedback(accumulatedText);
+      } else {
+        console.log(
+          '[v0] No matching feature found for capability - treating as new feature'
+        );
+        // No matching feature - treat as new feature instead
+        const featureDetails = await extractFeatureDetails(
+          accumulatedText,
+          transcriptBuffer
+        );
+
+        const newGroup: NodeGroup = {
+          id: generateId(),
+          name: featureDetails.name,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+          nodeIds: [],
+          centroid: { x: 200, y: 200 },
+          summary: featureDetails.summary,
+          userValue: featureDetails.userValue,
+          keyCapabilities: featureDetails.keyCapabilities,
+          technicalApproach: featureDetails.technicalApproach,
+          openQuestions: featureDetails.openQuestions,
+          relatedFeatures: featureDetails.relatedFeatures,
+          conversationHistory: [
+            {
+              timestamp: new Date(),
+              transcript: accumulatedText,
+              insights: analysis.reasoning,
+            },
+          ],
+        };
+        setGroups((prev) => [...prev, newGroup]);
+      }
+    }
+
+      // Clear buffer
+      setTranscriptBuffer([]);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [transcriptBuffer, groups, processAgentFeedback]);
 
   const handleResult = useCallback(
     async (text: string, isFinal: boolean) => {
@@ -200,43 +473,25 @@ export default function Page() {
       }
 
       if (isFinal && text.trim().length > 0) {
+        const finalText = text.trim();
+
         // Add final text to current session
         setCurrentSessionText((prev) => {
-          const newText = prev ? `${prev} ${text.trim()}` : text.trim();
+          const newText = prev ? `${prev} ${finalText}` : finalText;
           return newText;
         });
 
         // Add final text to full transcript
         setFullTranscript((prev) => {
-          const finalText = text.trim();
           // Append with space if there's existing text
           return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
         });
 
-        // Classify what type of requirement this is
-        const classification = await classifyRequirement(text);
-
-        if (classification.isRequirement) {
-          const title = await generateNodeTitle(text);
-
-          const newNode: NodeData = {
-            id: generateId(),
-            title, // AI-generated title
-            content: text, // Full transcript preserved as context
-            type: classification.type, // AI-determined type: product, design, or technical
-            status: 'pending',
-            x: 100 + Math.random() * 400,
-            y: 100 + Math.random() * 300,
-            width: 288,
-            height: 160,
-          };
-
-          setNodes((prev) => [...prev, newNode]);
-          processAgentFeedback(text);
-        }
+        // Add to transcript buffer for interval processing
+        setTranscriptBuffer((prev) => [...prev, finalText]);
       }
     },
-    [processAgentFeedback]
+    []
   );
 
   const {
@@ -249,8 +504,13 @@ export default function Page() {
     onResult: handleResult,
   });
 
-  const toggleRecording = useCallback(() => {
+  const toggleRecording = useCallback(async () => {
     if (isListening) {
+      // When stopping, process any remaining transcript in buffer
+      if (transcriptBuffer.length > 0) {
+        await processAccumulatedTranscript();
+      }
+
       // When stopping, create a new transcript entry if there's any text
       if (currentSessionText.trim()) {
         const newEntry: TranscriptEntry = {
@@ -270,7 +530,7 @@ export default function Page() {
       setCurrentSessionText('');
       startListening();
     }
-  }, [isListening, startListening, stopListening, currentSessionText]);
+  }, [isListening, startListening, stopListening, currentSessionText, transcriptBuffer, processAccumulatedTranscript]);
 
   const handleDelete = useCallback(() => {
     if (selectedNodes.length === 0) return;
@@ -311,6 +571,17 @@ export default function Page() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleRecording, handleDelete]);
+
+  // Interval-based transcript processing
+  useEffect(() => {
+    if (!isListening) return;
+
+    const intervalId = setInterval(() => {
+      processAccumulatedTranscript();
+    }, processingIntervalMs);
+
+    return () => clearInterval(intervalId);
+  }, [isListening, processingIntervalMs, processAccumulatedTranscript]);
 
   const handleNodeSelect = (id: string) => {
     setSelectedNodes((prev) =>
@@ -388,6 +659,10 @@ export default function Page() {
     );
   };
 
+  const handleGroupClick = (groupId: string) => {
+    setSelectedFeatureId(groupId);
+  };
+
   const handleToggleAgent = (agentId: string) => {
     setAgents((prev) =>
       prev.map((a) =>
@@ -412,6 +687,9 @@ export default function Page() {
             fullTranscript={fullTranscript}
             currentSessionText={currentSessionText}
             isRecording={isListening}
+            onManualAnalyze={processAccumulatedTranscript}
+            hasBufferedTranscript={transcriptBuffer.length > 0}
+            isAnalyzing={isAnalyzing}
           />
         )}
 
@@ -424,6 +702,7 @@ export default function Page() {
           onNodePositionUpdate={handleNodePositionUpdate}
           onGroupDrag={handleGroupDrag}
           onGroupRename={handleGroupRename}
+          onGroupClick={handleGroupClick}
           isRecording={isListening}
           onToggleRecording={toggleRecording}
           isTranscriptPanelOpen={isTranscriptPanelOpen}
@@ -445,6 +724,14 @@ export default function Page() {
         activeFeedback={activeFeedback}
         onMarkAsRead={handleMarkAsRead}
         onToggleAgent={handleToggleAgent}
+        onDeleteDiaryEntry={handleDeleteDiaryEntry}
+        onCrossOffDiaryEntry={handleCrossOffDiaryEntry}
+      />
+
+      {/* Feature Details Panel */}
+      <FeatureDetailsPanel
+        feature={groups.find((g) => g.id === selectedFeatureId) || null}
+        onClose={() => setSelectedFeatureId(null)}
       />
 
       {/* Build Prompt Dialog */}
