@@ -32,6 +32,7 @@ interface CanvasBoardProps {
   isTranscriptPanelOpen: boolean;
   onToggleTranscriptPanel: () => void;
   isAgentSidebarOpen: boolean;
+  isFeaturePanelOpen?: boolean;
   codingAgentPanel?: React.ReactNode;
 }
 
@@ -50,6 +51,7 @@ export function CanvasBoard({
   isTranscriptPanelOpen,
   onToggleTranscriptPanel,
   isAgentSidebarOpen,
+  isFeaturePanelOpen = false,
   codingAgentPanel,
 }: CanvasBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -146,7 +148,7 @@ export function CanvasBoard({
       className={cn(
         'h-full overflow-hidden bg-background relative cursor-crosshair transition-all duration-200',
         isTranscriptPanelOpen ? 'ml-80' : 'ml-12',
-        isAgentSidebarOpen ? 'mr-80' : 'mr-12'
+        isAgentSidebarOpen && !isFeaturePanelOpen ? 'mr-80' : isFeaturePanelOpen ? 'mr-96' : 'mr-12'
       )}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
@@ -298,9 +300,9 @@ export function CanvasBoard({
         {codingAgentPanel}
       </div>
 
-      {/* Controls Overlay */}
+        {/* Controls Overlay */}
       <div className='absolute bottom-8 left-8 flex flex-col gap-2 z-10 items-center'>
-        <div className='bg-card/80 backdrop-blur border border-border rounded-lg p-1 flex flex-col gap-1 shadow-xl'>
+        <div className='bg-card/90 backdrop-blur border border-border rounded-lg p-1 flex flex-col gap-1 shadow-xl'>
           <button
             onClick={() => setScale((s) => Math.min(s + 0.1, 3))}
             className='p-2 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
@@ -343,7 +345,7 @@ export function CanvasBoard({
             'size-10 rounded-lg flex items-center justify-center transition-all duration-300 shadow-xl',
             isRecording
               ? 'bg-red-500 text-white hover:bg-red-600'
-              : 'bg-white text-black hover:bg-gray-100 border border-border'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90 border border-border'
           )}
         >
           {isRecording ? (

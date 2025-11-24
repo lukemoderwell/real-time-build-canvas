@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
@@ -99,10 +99,11 @@ export default function Page() {
     y: 100,
   });
 
-  // Interval-based processing state
+  // Transcript processing state
   const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
-  const [processingIntervalMs] = useState(30000); // 30 seconds
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const pauseAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const PAUSE_DELAY_MS = 1500; // Analyze 1.5s after user stops speaking
 
   // Feature details panel state
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
@@ -471,32 +472,52 @@ export default function Page() {
     }
   }, [transcriptBuffer, groups, processAgentFeedback]);
 
-  const handleResult = useCallback(async (text: string, isFinal: boolean) => {
-    if (!isFinal) {
-      // Update current session text with interim results (this replaces previous interim)
-      setCurrentSessionText(text);
-      return;
-    }
+  const handleResult = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (!isFinal) {
+        // Update current session text with interim results (this replaces previous interim)
+        setCurrentSessionText(text);
 
-    if (isFinal && text.trim().length > 0) {
-      const finalText = text.trim();
+        // Clear any pending pause analysis since user is still speaking
+        if (pauseAnalysisTimeoutRef.current) {
+          clearTimeout(pauseAnalysisTimeoutRef.current);
+          pauseAnalysisTimeoutRef.current = null;
+        }
+        return;
+      }
 
-      // Add final text to current session
-      setCurrentSessionText((prev) => {
-        const newText = prev ? `${prev} ${finalText}` : finalText;
-        return newText;
-      });
+      if (isFinal && text.trim().length > 0) {
+        const finalText = text.trim();
 
-      // Add final text to full transcript
-      setFullTranscript((prev) => {
-        // Append with space if there's existing text
-        return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
-      });
+        // Add final text to current session
+        setCurrentSessionText((prev) => {
+          const newText = prev ? `${prev} ${finalText}` : finalText;
+          return newText;
+        });
 
-      // Add to transcript buffer for interval processing
-      setTranscriptBuffer((prev) => [...prev, finalText]);
-    }
-  }, []);
+        // Add final text to full transcript
+        setFullTranscript((prev) => {
+          // Append with space if there's existing text
+          return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
+        });
+
+        // Add to transcript buffer for processing
+        setTranscriptBuffer((prev) => [...prev, finalText]);
+
+        // Clear any existing timeout and set new one for pause-based analysis
+        if (pauseAnalysisTimeoutRef.current) {
+          clearTimeout(pauseAnalysisTimeoutRef.current);
+        }
+
+        // Trigger analysis after pause
+        pauseAnalysisTimeoutRef.current = setTimeout(() => {
+          processAccumulatedTranscript();
+          pauseAnalysisTimeoutRef.current = null;
+        }, PAUSE_DELAY_MS);
+      }
+    },
+    [processAccumulatedTranscript, PAUSE_DELAY_MS]
+  );
 
   const {
     isListening,
@@ -583,16 +604,29 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleRecording, handleDelete]);
 
-  // Interval-based transcript processing
+  // Cleanup pause analysis timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pauseAnalysisTimeoutRef.current) {
+        clearTimeout(pauseAnalysisTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Backup interval - catches anything pause detection misses
+  const BACKUP_INTERVAL_MS = 10000; // 10 seconds
   useEffect(() => {
     if (!isListening) return;
 
     const intervalId = setInterval(() => {
-      processAccumulatedTranscript();
-    }, processingIntervalMs);
+      // Only process if there's buffered content and not already analyzing
+      if (transcriptBuffer.length > 0 && !isAnalyzing) {
+        processAccumulatedTranscript();
+      }
+    }, BACKUP_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, [isListening, processingIntervalMs, processAccumulatedTranscript]);
+  }, [isListening, transcriptBuffer.length, isAnalyzing, processAccumulatedTranscript]);
 
   // Staggered agent thinking intervals - consolidated and optimized
   useEffect(() => {
@@ -868,6 +902,7 @@ export default function Page() {
             setIsTranscriptPanelOpen((prev) => !prev)
           }
           isAgentSidebarOpen={isAgentSidebarOpen}
+          isFeaturePanelOpen={selectedFeatureId !== null}
           codingAgentPanel={
             isPromptDialogOpen ? (
               <CodingAgentPanel

@@ -90,8 +90,8 @@ export function CodingAgentPanel({
         }}
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600/10 rounded-lg">
-            <Terminal className="h-5 w-5 text-blue-600" />
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Terminal className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h2 className="text-lg font-semibold">Coding Agent</h2>
@@ -113,7 +113,7 @@ export function CodingAgentPanel({
         {isGenerating ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-sm text-muted-foreground">Generating prompt...</p>
             </div>
           </div>

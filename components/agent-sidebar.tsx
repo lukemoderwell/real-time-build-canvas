@@ -39,12 +39,12 @@ export function AgentSidebar({
 
   if (isMinimized) {
     return (
-      <div className='w-12 h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
-        <div className='p-4 border-b border-border flex items-center justify-center'>
+      <div className='w-12 h-full border-l border-sidebar-border bg-sidebar flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
+        <div className='p-4 border-b border-sidebar-border flex items-center justify-center'>
           {onToggleMinimize && (
             <button
               onClick={onToggleMinimize}
-              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              className='p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground hover:text-white transition-colors'
               title='Expand agent sidebar'
             >
               <ChevronLeft size={16} />
@@ -56,16 +56,16 @@ export function AgentSidebar({
   }
 
   return (
-    <div className='w-80 h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
-      <div className='p-4 border-b border-border flex items-center justify-between'>
-        <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
+    <div className='w-80 h-full border-l border-sidebar-border bg-sidebar flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
+      <div className='p-4 border-b border-sidebar-border flex items-center justify-between'>
+        <h2 className='text-xs font-medium text-sidebar-foreground uppercase tracking-wider'>
           Expert Agents
         </h2>
 
         <div className='flex items-center gap-2'>
           <Popover>
             <PopoverTrigger asChild>
-              <button className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'>
+              <button className='p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground hover:text-white transition-colors'>
                 <Settings size={14} />
               </button>
             </PopoverTrigger>
@@ -109,7 +109,7 @@ export function AgentSidebar({
           {onToggleMinimize && (
             <button
               onClick={onToggleMinimize}
-              className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'
+              className='p-1.5 hover:bg-sidebar-accent rounded-md text-sidebar-foreground hover:text-white transition-colors'
               title='Minimize agent sidebar'
             >
               <ChevronRight size={16} />
@@ -167,9 +167,9 @@ function AgentItem({
           className={cn(
             'flex items-center gap-3 p-3 rounded-lg border transition-all duration-300 cursor-pointer w-full text-left select-none',
             agent.isActive
-              ? 'bg-secondary/80 border-primary/20 shadow-lg shadow-primary/5'
-              : 'bg-background/20 border-transparent hover:bg-secondary/40 hover:border-border/50',
-            isOpen && 'bg-secondary/40 border-border/50'
+              ? 'bg-sidebar-accent border-sidebar-primary/30 shadow-lg shadow-sidebar-primary/10'
+              : 'bg-sidebar-accent/20 border-transparent hover:bg-sidebar-accent/40 hover:border-sidebar-border/50',
+            isOpen && 'bg-sidebar-accent/40 border-sidebar-border/50'
           )}
         >
           <div className='relative'>
@@ -188,7 +188,7 @@ function AgentItem({
               <Icon size={18} />
             </div>
             {agent.unreadCount > 0 && !isOpen && (
-              <div className='absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-background z-10'>
+              <div className='absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-sidebar z-10'>
                 <span className='text-[10px] font-bold text-white'>
                   {agent.unreadCount}
                 </span>
@@ -197,7 +197,7 @@ function AgentItem({
           </div>
           <div className='flex-1 min-w-0'>
             <div className='flex items-center justify-between'>
-              <div className='font-medium text-sm truncate'>{agent.name}</div>
+              <div className='font-medium text-sm truncate text-sidebar-foreground'>{agent.name}</div>
               {agent.isActive && (
                 <motion.div
                   layoutId='speaking-indicator'
@@ -212,19 +212,19 @@ function AgentItem({
                         duration: 0.6,
                         delay: i * 0.1,
                       }}
-                      className='w-0.5 bg-primary rounded-full'
+                      className='w-0.5 bg-sidebar-primary rounded-full'
                     />
                   ))}
                 </motion.div>
               )}
             </div>
-            <div className='text-xs text-muted-foreground capitalize truncate'>
+            <div className='text-xs text-sidebar-foreground/70 capitalize truncate'>
               {agent.role}{' '}
             </div>
           </div>
           <ChevronDown
             className={cn(
-              'w-4 h-4 text-muted-foreground/50 transition-transform duration-300',
+              'w-4 h-4 text-sidebar-foreground/50 transition-transform duration-300',
               isOpen && 'rotate-180'
             )}
           />
@@ -264,9 +264,9 @@ function AgentItem({
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className='overflow-hidden'
           >
-            <div className='pt-1 pb-3 px-3 space-y-3 border-x border-b border-border/50 rounded-b-lg mx-1 bg-background/30'>
+            <div             className='pt-1 pb-3 px-3 space-y-3 border-x border-b border-sidebar-border/50 rounded-b-lg mx-1 bg-sidebar-accent/10'>
               {agent.diaryEntries.length === 0 && agent.crossedOffEntries.length === 0 ? (
-                <div className='text-center py-4 text-muted-foreground text-xs'>
+                <div className='text-center py-4 text-sidebar-foreground/70 text-xs'>
                   <Book className='w-4 h-4 mx-auto mb-2 opacity-20' />
                   <p>No thoughts yet.</p>
                 </div>
@@ -299,12 +299,12 @@ function AgentItem({
                                   backgroundColor: `${agent.color}10`,
                                 }}
                               >
-                                <p className='text-xs leading-relaxed text-foreground/90'>
+                                <p className='text-xs leading-relaxed text-sidebar-foreground/90'>
                                   {entry.content}
                                 </p>
                               </div>
                               <div className='flex items-center gap-2 mt-1 ml-1'>
-                                <div className='flex items-center gap-1 text-[9px] text-muted-foreground opacity-0 group-hover/entry:opacity-100 transition-opacity'>
+                                <div className='flex items-center gap-1 text-[9px] text-sidebar-foreground/60 opacity-0 group-hover/entry:opacity-100 transition-opacity'>
                                   <Clock size={8} />
                                   <span>
                                     {new Date(entry.timestamp).toLocaleTimeString()}
@@ -316,7 +316,7 @@ function AgentItem({
                                       e.stopPropagation();
                                       onCrossOffDiaryEntry(agent.id, entry.id);
                                     }}
-                                    className='p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors'
+                                    className='p-1 hover:bg-sidebar-accent rounded text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors'
                                     title='Cross off'
                                   >
                                     <Check size={12} />
@@ -326,7 +326,7 @@ function AgentItem({
                                       e.stopPropagation();
                                       onDeleteDiaryEntry(agent.id, entry.id);
                                     }}
-                                    className='p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors'
+                                    className='p-1 hover:bg-destructive/10 rounded text-sidebar-foreground/70 hover:text-destructive transition-colors'
                                     title='Delete'
                                   >
                                     <X size={12} />
@@ -341,7 +341,7 @@ function AgentItem({
                   {agent.crossedOffEntries.length > 0 && (
                     <>
                       {agent.diaryEntries.length > 0 && (
-                        <div className='border-t border-border/30 my-2' />
+                        <div className='border-t border-sidebar-border/30 my-2' />
                       )}
                       {agent.crossedOffEntries
                         .slice()
@@ -368,11 +368,11 @@ function AgentItem({
                                   backgroundColor: `${agent.color}10`,
                                 }}
                               >
-                                <p className='text-xs leading-relaxed text-foreground/60'>
+                                <p className='text-xs leading-relaxed text-sidebar-foreground/60'>
                                   {entry.content}
                                 </p>
                               </div>
-                              <div className='flex items-center gap-1 mt-1 ml-1 text-[9px] text-muted-foreground'>
+                              <div className='flex items-center gap-1 mt-1 ml-1 text-[9px] text-sidebar-foreground/60'>
                                 <Clock size={8} />
                                 <span>
                                   {new Date(entry.timestamp).toLocaleTimeString()}

@@ -21,7 +21,7 @@ export function ControlBar({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             onClick={onSendToAgent}
-            className="h-12 px-5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center gap-2.5 font-medium text-sm whitespace-nowrap shadow-lg shadow-blue-600/20"
+            className="h-12 px-5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl flex items-center gap-2.5 font-medium text-sm whitespace-nowrap shadow-lg shadow-primary/20"
           >
             <Terminal size={18} />
             <span>Send to Cursor ({selectedCount})</span>

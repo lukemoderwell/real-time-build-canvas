@@ -45,8 +45,8 @@ export function StatusPanel({ nodes }: StatusPanelProps) {
               className="group flex items-start gap-3 p-2.5 rounded-lg bg-background/40 border border-border/40 hover:bg-background/60 hover:border-border/60 transition-colors"
             >
               <div className="shrink-0 mt-0.5">
-                {task.status === "processing" && <Loader2 size={14} className="text-blue-400 animate-spin" />}
-                {task.status === "coded" && <CheckCircle2 size={14} className="text-green-400" />}
+                {task.status === "processing" && <Loader2 size={14} className="text-primary animate-spin" />}
+                {task.status === "coded" && <CheckCircle2 size={14} className="text-primary" />}
                 {task.status === "review" && <Clock size={14} className="text-yellow-400" />}
               </div>
 
@@ -55,7 +55,7 @@ export function StatusPanel({ nodes }: StatusPanelProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-muted-foreground capitalize">{task.status}</span>
                   {task.status === "processing" && (
-                    <span className="text-[10px] text-blue-400 font-mono">Compiling...</span>
+                    <span className="text-[10px] text-primary font-mono">Compiling...</span>
                   )}
                 </div>
               </div>

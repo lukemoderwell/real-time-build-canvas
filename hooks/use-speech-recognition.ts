@@ -65,6 +65,16 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const isStartingRef = useRef(false)
 
+  // Use refs for callbacks to avoid stale closures
+  const onResultRef = useRef(onResult)
+  const onErrorRef = useRef(onError)
+
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onResultRef.current = onResult
+    onErrorRef.current = onError
+  }, [onResult, onError])
+
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -86,10 +96,11 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
           if (result.isFinal) {
             finalTranscript += text
-            if (onResult) onResult(text.trim(), true)
+            // Use ref to always get latest callback
+            if (onResultRef.current) onResultRef.current(text.trim(), true)
           } else {
             interimTranscript += text
-            if (onResult) onResult(text, false)
+            if (onResultRef.current) onResultRef.current(text, false)
           }
         }
 
@@ -111,14 +122,14 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
         console.warn("Speech recognition error:", event.error)
 
-        if (onError) onError(event.error)
+        if (onErrorRef.current) onErrorRef.current(event.error)
         setIsListening(false)
         isStartingRef.current = false
       }
 
       recognitionRef.current = recognition
     }
-  }, [onResult, onError])
+  }, []) // Empty deps - callbacks accessed via refs
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening && !isStartingRef.current) {

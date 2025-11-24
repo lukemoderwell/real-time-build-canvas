@@ -1,6 +1,7 @@
 'use server';
 
 import { generateText } from 'ai';
+import { STANDARD_MODEL } from '@/lib/models';
 
 export async function generateBuildPrompt(
   nodes: Array<{ title: string; content: string; type: string }>
@@ -15,7 +16,7 @@ ${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
       .join('\n');
 
     const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `You are a best-in-class design engineer tasked with building a feature set based on product requirements.
 
 You've been given the following requirements:
@@ -113,7 +114,7 @@ export async function generateAgentThoughts(
     }
 
     const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `You are ${agentName}, a ${agentRole} engineer listening to a product brainstorming session.
 
 Domain expertise: ${context.domain}
@@ -204,7 +205,7 @@ export async function analyzeTranscript(
         : '';
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `You are analyzing a product conversation to determine if someone is discussing a HIGH-LEVEL FEATURE or a SPECIFIC CAPABILITY.
 
 DEFINITIONS:
@@ -284,7 +285,7 @@ export async function extractFeatureDetails(
         : '';
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `You are a product manager extracting feature requirements from a natural conversation.
 
 CURRENT TRANSCRIPT: "${transcript}"${historyContext}
@@ -391,7 +392,7 @@ export async function findMatchingFeature(
       .join('\n\n');
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `You are matching a new capability to an existing feature group.
 
 TRANSCRIPT: "${transcript}"
@@ -447,7 +448,7 @@ export async function extractCapabilityDetails(
 ): Promise<{ title: string; description: string }> {
   try {
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: STANDARD_MODEL,
       prompt: `Extract a capability from this transcript.
 
 TRANSCRIPT: "${transcript}"
