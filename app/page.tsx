@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
@@ -10,6 +10,16 @@ import { StatusPanel } from '@/components/status-panel';
 import { FeatureDetailsPanel } from '@/components/feature-details-panel';
 import { CodingAgentPanel } from '@/components/coding-agent-panel';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Sparkles, Loader2 } from 'lucide-react';
 import type { Agent, NodeData, NodeGroup, TranscriptEntry } from '@/lib/types';
 import { generateId } from '@/lib/utils';
@@ -101,13 +111,21 @@ export default function Page() {
 
   // Interval-based processing state
   const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
-  const [processingIntervalMs] = useState(30000); // 30 seconds
+  const [processingIntervalMs] = useState(10000); // 10 seconds (reduced from 30s for faster updates)
+  const [autoAnalysisDelayMs] = useState(1500); // 1.5 seconds pause triggers auto-analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const autoAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Feature details panel state
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
     null
   );
+
+  // Delete confirmation modal state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    featuresToDelete: NodeGroup[];
+  }>({ isOpen: false, featuresToDelete: [] });
 
   const addAgentThought = useCallback((agentId: string, content: string) => {
     setAgents((prev) =>
@@ -543,7 +561,8 @@ export default function Page() {
     processAccumulatedTranscript,
   ]);
 
-  const handleDelete = useCallback(() => {
+  // Perform the actual deletion (called directly or after confirmation)
+  const performDelete = useCallback(() => {
     if (selectedNodes.length === 0) return;
 
     setNodes((prev) => prev.filter((node) => !selectedNodes.includes(node.id)));
@@ -556,7 +575,41 @@ export default function Page() {
         .filter((group) => group.nodeIds.length > 0)
     );
     setSelectedNodes([]);
+    setDeleteConfirmation({ isOpen: false, featuresToDelete: [] });
   }, [selectedNodes]);
+
+  // Check if deletion would remove features and show confirmation if needed
+  const handleDelete = useCallback(() => {
+    if (selectedNodes.length === 0) return;
+
+    // Find features (groups) that would be completely deleted
+    const featuresToDelete = groups.filter((group) => {
+      // Check if all nodes in this group are selected for deletion
+      const remainingNodes = group.nodeIds.filter(
+        (id) => !selectedNodes.includes(id)
+      );
+      return remainingNodes.length === 0 && group.nodeIds.length > 0;
+    });
+
+    // Also check for empty features that might be selected via their group
+    // (features with no capabilities that would be deleted)
+    const emptyFeaturesToDelete = groups.filter(
+      (group) => group.nodeIds.length === 0
+    );
+
+    const allFeaturesToDelete = [...featuresToDelete, ...emptyFeaturesToDelete];
+
+    if (allFeaturesToDelete.length > 0) {
+      // Show confirmation modal for feature deletion
+      setDeleteConfirmation({
+        isOpen: true,
+        featuresToDelete: allFeaturesToDelete,
+      });
+    } else {
+      // No features affected, delete capabilities directly
+      performDelete();
+    }
+  }, [selectedNodes, groups, performDelete]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -583,16 +636,57 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleRecording, handleDelete]);
 
-  // Interval-based transcript processing
+  // Auto-analysis: Trigger analysis automatically after a pause in speech
+  useEffect(() => {
+    if (!isListening || transcriptBuffer.length === 0 || isAnalyzing) {
+      // Clear timeout if we're not listening, buffer is empty, or already analyzing
+      if (autoAnalysisTimeoutRef.current) {
+        clearTimeout(autoAnalysisTimeoutRef.current);
+        autoAnalysisTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Check if buffer has meaningful content (at least 2 items or total length > 50 chars)
+    const totalLength = transcriptBuffer.join(' ').length;
+    const hasMeaningfulContent = transcriptBuffer.length >= 2 || totalLength > 50;
+
+    if (hasMeaningfulContent) {
+      // Clear any existing timeout
+      if (autoAnalysisTimeoutRef.current) {
+        clearTimeout(autoAnalysisTimeoutRef.current);
+      }
+
+      // Set up debounced auto-analysis after a pause
+      autoAnalysisTimeoutRef.current = setTimeout(() => {
+        if (transcriptBuffer.length > 0 && !isAnalyzing) {
+          processAccumulatedTranscript();
+        }
+        autoAnalysisTimeoutRef.current = null;
+      }, autoAnalysisDelayMs);
+    }
+
+    return () => {
+      if (autoAnalysisTimeoutRef.current) {
+        clearTimeout(autoAnalysisTimeoutRef.current);
+        autoAnalysisTimeoutRef.current = null;
+      }
+    };
+  }, [transcriptBuffer, isListening, isAnalyzing, autoAnalysisDelayMs, processAccumulatedTranscript]);
+
+  // Interval-based transcript processing (fallback - ensures nothing gets stuck)
   useEffect(() => {
     if (!isListening) return;
 
     const intervalId = setInterval(() => {
-      processAccumulatedTranscript();
+      // Only process if there's content and we're not already analyzing
+      if (transcriptBuffer.length > 0 && !isAnalyzing) {
+        processAccumulatedTranscript();
+      }
     }, processingIntervalMs);
 
     return () => clearInterval(intervalId);
-  }, [isListening, processingIntervalMs, processAccumulatedTranscript]);
+  }, [isListening, processingIntervalMs, processAccumulatedTranscript, transcriptBuffer.length, isAnalyzing]);
 
   // Staggered agent thinking intervals - consolidated and optimized
   useEffect(() => {
@@ -912,6 +1006,51 @@ export default function Page() {
         onClose={() => setSelectedFeatureId(null)}
         onSendToAgent={handleSendFeatureToAgent}
       />
+
+      {/* Delete Feature Confirmation Modal */}
+      <AlertDialog
+        open={deleteConfirmation.isOpen}
+        onOpenChange={(open) =>
+          setDeleteConfirmation((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Feature?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{' '}
+              {deleteConfirmation.featuresToDelete.length === 1 ? (
+                <>
+                  the feature{' '}
+                  <span className='font-semibold text-foreground'>
+                    &quot;{deleteConfirmation.featuresToDelete[0]?.name}&quot;
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className='font-semibold text-foreground'>
+                    {deleteConfirmation.featuresToDelete.length} features
+                  </span>
+                  :{' '}
+                  {deleteConfirmation.featuresToDelete
+                    .map((f) => f.name)
+                    .join(', ')}
+                </>
+              )}{' '}
+              and all associated capabilities. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={performDelete}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
