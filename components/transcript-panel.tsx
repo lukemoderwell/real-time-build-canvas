@@ -14,6 +14,8 @@ interface TranscriptPanelProps {
   isAnalyzing?: boolean;
   isMinimized?: boolean;
   onToggleMinimize?: () => void;
+  width: number;
+  onWidthChange: (width: number) => void;
 }
 
 export function TranscriptPanel({
@@ -24,15 +26,24 @@ export function TranscriptPanel({
   isAnalyzing = false,
   isMinimized = false,
   onToggleMinimize,
+  width,
+  onWidthChange,
 }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { width, isResizing, handleMouseDown } = useResizable({
-    initialWidth: 320,
+  const { width: resizeWidth, isResizing, handleMouseDown } = useResizable({
+    initialWidth: width,
     minWidth: 200,
     maxWidth: 500,
     direction: 'right',
     storageKey: 'transcript-panel-width',
   });
+
+  // Sync resize width changes back to parent
+  useEffect(() => {
+    if (resizeWidth !== width) {
+      onWidthChange(resizeWidth);
+    }
+  }, [resizeWidth, width, onWidthChange]);
 
   // Auto-scroll to bottom when new text is added (but only if user is near bottom)
   useEffect(() => {
@@ -87,7 +98,7 @@ export function TranscriptPanel({
 
   return (
     <div
-      style={{ width: `${width}px` }}
+      style={{ width: `${resizeWidth}px` }}
       className='h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute left-0 top-0 shadow-2xl'
     >
       <ResizeHandle direction="right" onMouseDown={handleMouseDown} isResizing={isResizing} />

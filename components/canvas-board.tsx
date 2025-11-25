@@ -34,6 +34,7 @@ interface CanvasBoardProps {
   onToggleTranscriptPanel: () => void;
   isAgentSidebarOpen: boolean;
   codingAgentPanel?: React.ReactNode;
+  transcriptPanelWidth: number;
 }
 
 export function CanvasBoard({
@@ -53,6 +54,7 @@ export function CanvasBoard({
   onToggleTranscriptPanel,
   isAgentSidebarOpen,
   codingAgentPanel,
+  transcriptPanelWidth,
 }: CanvasBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -145,9 +147,11 @@ export function CanvasBoard({
   return (
     <div
       ref={containerRef}
+      style={{
+        marginLeft: isTranscriptPanelOpen ? `${transcriptPanelWidth}px` : '48px',
+      }}
       className={cn(
         'h-full overflow-hidden bg-background relative cursor-crosshair transition-all duration-200',
-        isTranscriptPanelOpen ? 'ml-80' : 'ml-12',
         isAgentSidebarOpen ? 'mr-80' : 'mr-12'
       )}
       onWheel={handleWheel}
@@ -301,8 +305,8 @@ export function CanvasBoard({
         {codingAgentPanel}
       </div>
 
-      {/* Controls Overlay */}
-      <div className='absolute bottom-8 left-8 flex flex-col gap-2 z-10 items-center'>
+      {/* Controls Overlay - positioned relative to this container which already has margins */}
+      <div className='absolute bottom-8 left-6 flex flex-col gap-2 z-10 items-center'>
         <div className='bg-card/80 backdrop-blur border border-border rounded-lg p-1 flex flex-col gap-1 shadow-xl'>
           <button
             onClick={() => setScale((s) => Math.min(s + 0.1, 3))}

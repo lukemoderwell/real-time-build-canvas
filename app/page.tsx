@@ -93,6 +93,18 @@ export default function Page() {
     message: string;
   } | null>(null);
   const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(true);
+  const [transcriptPanelWidth, setTranscriptPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('transcript-panel-width');
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 200 && parsed <= 500) {
+          return parsed;
+        }
+      }
+    }
+    return 320;
+  });
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(true);
   const [currentSessionText, setCurrentSessionText] = useState('');
   const [fullTranscript, setFullTranscript] = useState('');
@@ -109,6 +121,7 @@ export default function Page() {
   const processingIntervalMs = 10000; // 10 seconds
   const autoAnalysisDelayMs = 1500; // 1.5 seconds pause triggers auto-analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const isAnalyzingRef = useRef(false); // Ref to prevent race conditions
   const autoAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Feature details panel state
@@ -273,7 +286,11 @@ export default function Page() {
   const processAccumulatedTranscript = useCallback(async () => {
     if (transcriptBuffer.length === 0) return;
 
+    // Use ref to prevent race conditions - check and set atomically
+    if (isAnalyzingRef.current) return;
+    isAnalyzingRef.current = true;
     setIsAnalyzing(true);
+
     try {
       const accumulatedText = transcriptBuffer.join(' ');
 
@@ -537,6 +554,7 @@ export default function Page() {
       console.error('[v0] Error during transcript analysis:', error);
       throw error;
     } finally {
+      isAnalyzingRef.current = false;
       setIsAnalyzing(false);
     }
   }, [transcriptBuffer, groups, nodes, processAgentFeedback]);
@@ -990,6 +1008,8 @@ export default function Page() {
           isAnalyzing={isAnalyzing}
           isMinimized={!isTranscriptPanelOpen}
           onToggleMinimize={() => setIsTranscriptPanelOpen((prev) => !prev)}
+          width={transcriptPanelWidth}
+          onWidthChange={setTranscriptPanelWidth}
         />
 
         <CanvasBoard
@@ -1010,6 +1030,7 @@ export default function Page() {
             setIsTranscriptPanelOpen((prev) => !prev)
           }
           isAgentSidebarOpen={isAgentSidebarOpen}
+          transcriptPanelWidth={transcriptPanelWidth}
           codingAgentPanel={
             isPromptDialogOpen ? (
               <CodingAgentPanel

@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useResizable } from '@/hooks/use-resizable';
 import { ResizeHandle } from '@/components/resize-handle';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface AgentSidebarProps {
   agents: Agent[];
@@ -75,7 +76,8 @@ export function AgentSidebar({
           Expert Agents
         </h2>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-1'>
+          <ThemeToggle />
           <Popover>
             <PopoverTrigger asChild>
               <button className='p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-foreground transition-colors'>
