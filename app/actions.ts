@@ -1,5 +1,6 @@
 'use server';
 
+import { models } from '@/lib/models';
 import { generateText } from 'ai';
 
 export async function generateBuildPrompt(
@@ -15,7 +16,7 @@ ${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
       .join('\n');
 
     const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.medium}`,
       prompt: `You are a best-in-class design engineer tasked with building a feature set based on product requirements.
 
 You've been given the following requirements:
@@ -36,13 +37,13 @@ Your job is to write a comprehensive, detailed prompt that a coding agent can us
 Write the prompt as if you're briefing a senior developer. Be thorough but concise. Focus on what needs to be built, not how to build it (let the coding agent figure that out).
 
 Output ONLY the prompt text, no markdown formatting, no explanations.`,
-      maxTokens: 2000,
+      maxOutputTokens: 2000,
       temperature: 0.3,
     });
 
     return text.trim();
   } catch (error) {
-    console.log('[v0] Error generating build prompt (using fallback):', error);
+    console.log('Error generating build prompt (using fallback):', error);
     // Fallback: create a simple structured prompt
     const nodesText = nodes
       .map(
@@ -113,7 +114,7 @@ export async function generateAgentThoughts(
     }
 
     const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.small}`,
       prompt: `You are ${agentName}, a ${agentRole} engineer listening to a product brainstorming session.
 
 Domain expertise: ${context.domain}
@@ -204,7 +205,7 @@ export async function analyzeTranscript(
         : '';
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.medium}`,
       prompt: `You are analyzing a product conversation to determine if someone is discussing a HIGH-LEVEL FEATURE or a SPECIFIC CAPABILITY.
 
 DEFINITIONS:
@@ -241,7 +242,7 @@ Respond with ONLY this JSON (no markdown):
   "confidence": 0.0 to 1.0,
   "reasoning": "brief explanation"
 }`,
-      maxTokens: 150,
+      maxOutputTokens: 150,
       temperature: 0.2,
     });
 
@@ -284,7 +285,7 @@ export async function extractFeatureDetails(
         : '';
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.medium}`,
       prompt: `You are a product manager extracting feature requirements from a natural conversation.
 
 CURRENT TRANSCRIPT: "${transcript}"${historyContext}
@@ -324,7 +325,7 @@ Respond with ONLY this JSON (no markdown):
 }
 
 Note: If no technical details were discussed, omit technicalApproach. Keep arrays empty if nothing to include.`,
-      maxTokens: 800,
+      maxOutputTokens: 800,
       temperature: 0.3,
     });
 
@@ -391,7 +392,7 @@ export async function findMatchingFeature(
       .join('\n\n');
 
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.medium}`,
       prompt: `You are matching a new capability to an existing feature group.
 
 TRANSCRIPT: "${transcript}"
@@ -414,7 +415,7 @@ Respond with ONLY this JSON (no markdown):
 }
 
 If confidence is below 0.7, return null - better to create a new feature than mismatch.`,
-      maxTokens: 150,
+      maxOutputTokens: 150,
       temperature: 0.2,
     });
 
@@ -447,7 +448,7 @@ export async function extractCapabilityDetails(
 ): Promise<{ title: string; description: string }> {
   try {
     const { text: result } = await generateText({
-      model: 'openai/gpt-4o-mini',
+      model: `openai/${models.small}`,
       prompt: `Extract a capability from this transcript.
 
 TRANSCRIPT: "${transcript}"
@@ -463,7 +464,7 @@ Respond with ONLY this JSON (no markdown):
   "title": "Capability Title",
   "description": "Brief description"
 }`,
-      maxTokens: 100,
+      maxOutputTokens: 150,
       temperature: 0.2,
     });
 
