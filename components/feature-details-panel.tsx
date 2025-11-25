@@ -1,6 +1,7 @@
 'use client';
 
 import { X, Terminal } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { NodeGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,10 +19,16 @@ export function FeatureDetailsPanel({
   onClose,
   onSendToAgent,
 }: FeatureDetailsPanelProps) {
-  if (!feature) return null;
-
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-2xl z-50 flex flex-col">
+    <AnimatePresence>
+      {feature && (
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-2xl z-50 flex flex-col"
+        >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex-1 min-w-0">
@@ -57,8 +64,8 @@ export function FeatureDetailsPanel({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-6">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 py-4 space-y-6">
           {/* Summary */}
           {feature.summary && (
             <div>
@@ -203,6 +210,8 @@ export function FeatureDetailsPanel({
           )}
         </div>
       </ScrollArea>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
