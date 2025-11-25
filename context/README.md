@@ -10,7 +10,9 @@ System design and structural decisions
 ## Features
 How specific features work
 
-- _Nothing here yet_
+- [**resizable-panels.md**](./features/resizable-panels.md) - Drag-to-resize side panels with localStorage persistence
+- [**agent-thoughts.md**](./features/agent-thoughts.md) - How expert agents generate diary entries from transcript
+- [**node-positioning.md**](./features/node-positioning.md) - Auto-positioning capability nodes to avoid overlaps
 
 ## AI & Prompting
 How the AI analyzes conversations and creates features
