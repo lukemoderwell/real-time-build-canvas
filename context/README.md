@@ -25,7 +25,7 @@ Interface patterns and design choices
 ## Decisions
 Key decisions and why we made them
 
-- _Nothing here yet_
+- [**linting.md**](./decisions/linting.md) - Run `pnpm run lint` after JS/TS changes
 
 ---
 
