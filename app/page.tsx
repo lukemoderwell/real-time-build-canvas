@@ -5,7 +5,7 @@ import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
 import { ControlBar } from '@/components/control-bar';
-import { StatusPanel } from '@/components/status-panel';
+// import { StatusPanel } from '@/components/status-panel';
 import { FeatureDetailsPanel } from '@/components/feature-details-panel';
 import { CodingAgentPanel } from '@/components/coding-agent-panel';
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { Agent, NodeData, NodeGroup } from '@/lib/types';
-import { generateId, mergeFeatureDetails } from '@/lib/utils';
+import { generateId, mergeFeatureDetails, findNonOverlappingPosition, positionNewNodes, generateRandomColor } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useSpacebarRecording } from '@/hooks/use-spacebar-recording';
 import {
@@ -331,21 +331,31 @@ export default function Page() {
               !existingNodeTitles.includes(cap.toLowerCase())
           );
 
-          // Create nodes for new capabilities
-          const newCapabilityNodes: NodeData[] =
-            newCapabilities.length > 0 && existingGroup
-              ? newCapabilities.map((capability, index) => ({
-                  id: generateId(),
-                  title: capability,
-                  description: '',
-                  groupId: match.matchedGroupId!,
-                  type: 'capability' as const,
-                  x: existingGroup.centroid.x + (index % 3) * 300 - 150,
-                  y: existingGroup.centroid.y + Math.floor(index / 3) * 180 + 200,
-                  width: 288,
-                  height: 160,
-                }))
-              : [];
+          // Create nodes for new capabilities with non-overlapping positions
+          const newCapabilityNodes: NodeData[] = (() => {
+            if (newCapabilities.length === 0 || !existingGroup) return [];
+
+            const positions = positionNewNodes(
+              nodes,
+              existingGroup.centroid,
+              newCapabilities.length,
+              288,
+              160,
+              match.matchedGroupId
+            );
+
+            return newCapabilities.map((capability, index) => ({
+              id: generateId(),
+              title: capability,
+              description: '',
+              groupId: match.matchedGroupId!,
+              type: 'capability' as const,
+              x: positions[index].x,
+              y: positions[index].y,
+              width: 288,
+              height: 160,
+            }));
+          })();
 
           if (newCapabilityNodes.length > 0) {
             setNodes((prev) => [...prev, ...newCapabilityNodes]);
@@ -368,16 +378,24 @@ export default function Page() {
             y: 200 + Math.random() * 400,
           };
 
-          // Create capability nodes from keyCapabilities
+          // Create capability nodes with non-overlapping positions
+          const positions = positionNewNodes(
+            nodes,
+            baseCentroid,
+            featureDetails.keyCapabilities.length,
+            288,
+            160
+          );
+
           const capabilityNodes: NodeData[] = featureDetails.keyCapabilities.map(
             (capability, index) => ({
               id: generateId(),
               title: capability,
-              description: '', // Brief description can be added later
+              description: '',
               groupId: newGroupId,
               type: 'capability' as const,
-              x: baseCentroid.x + (index % 3) * 300 - 150,
-              y: baseCentroid.y + Math.floor(index / 3) * 180,
+              x: positions[index]?.x ?? baseCentroid.x,
+              y: positions[index]?.y ?? baseCentroid.y,
               width: 288,
               height: 160,
             })
@@ -386,7 +404,7 @@ export default function Page() {
           const newGroup: NodeGroup = {
             id: newGroupId,
             name: featureDetails.name,
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            color: generateRandomColor(),
             nodeIds: capabilityNodes.map((n) => n.id),
             centroid: baseCentroid,
             summary: featureDetails.summary,
@@ -428,6 +446,19 @@ export default function Page() {
             accumulatedText
           );
 
+          // Find the group's centroid for positioning
+          const targetGroup = groups.find((g) => g.id === match.matchedGroupId);
+          const centroid = targetGroup?.centroid || { x: 400, y: 300 };
+
+          // Find non-overlapping position
+          const position = findNonOverlappingPosition(
+            nodes,
+            centroid,
+            288,
+            160,
+            match.matchedGroupId
+          );
+
           // Create new capability node
           const newNodeId = generateId();
           const newNode: NodeData = {
@@ -436,8 +467,8 @@ export default function Page() {
             description: capabilityDetails.description,
             groupId: match.matchedGroupId,
             type: 'capability',
-            x: 100 + Math.random() * 400,
-            y: 100 + Math.random() * 300,
+            x: position.x,
+            y: position.y,
             width: 288,
             height: 160,
           };
@@ -908,7 +939,7 @@ export default function Page() {
     const newGroup: NodeGroup = {
       id: newGroupId,
       name: featureName,
-      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+      color: generateRandomColor(),
       nodeIds: [],
       centroid: baseCentroid,
       summary: '',
@@ -998,7 +1029,7 @@ export default function Page() {
           }
         />
 
-        <StatusPanel nodes={nodes} />
+        {/* <StatusPanel nodes={nodes} /> */}
 
         <ControlBar
           onSendToAgent={handleSendToAgent}

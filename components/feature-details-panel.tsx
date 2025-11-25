@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useResizable } from '@/hooks/use-resizable';
+import { ResizeHandle } from '@/components/resize-handle';
 
 interface FeatureDetailsPanelProps {
   feature: NodeGroup | null;
@@ -23,6 +25,14 @@ export function FeatureDetailsPanel({
   onDelete,
   onCreateRelatedFeature,
 }: FeatureDetailsPanelProps) {
+  const { width, isResizing, handleMouseDown } = useResizable({
+    initialWidth: 384,
+    minWidth: 300,
+    maxWidth: 600,
+    direction: 'left',
+    storageKey: 'feature-panel-width',
+  });
+
   return (
     <AnimatePresence>
       {feature && (
@@ -31,8 +41,10 @@ export function FeatureDetailsPanel({
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-2xl z-50 flex flex-col"
+          style={{ width: `${width}px` }}
+          className="fixed right-0 top-0 h-full bg-background border-l border-border shadow-2xl z-50 flex flex-col"
         >
+          <ResizeHandle direction="left" onMouseDown={handleMouseDown} isResizing={isResizing} />
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex-1 min-w-0">

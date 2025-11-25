@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useResizable } from '@/hooks/use-resizable';
+import { ResizeHandle } from '@/components/resize-handle';
 
 interface AgentSidebarProps {
   agents: Agent[];
@@ -36,6 +38,13 @@ export function AgentSidebar({
   onToggleMinimize,
 }: AgentSidebarProps) {
   const enabledAgents = agents.filter((a) => a.isEnabled);
+  const { width, isResizing, handleMouseDown } = useResizable({
+    initialWidth: 320,
+    minWidth: 200,
+    maxWidth: 500,
+    direction: 'left',
+    storageKey: 'agent-sidebar-width',
+  });
 
   if (isMinimized) {
     return (
@@ -56,7 +65,11 @@ export function AgentSidebar({
   }
 
   return (
-    <div className='w-80 h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'>
+    <div
+      style={{ width: `${width}px` }}
+      className='h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'
+    >
+      <ResizeHandle direction="left" onMouseDown={handleMouseDown} isResizing={isResizing} />
       <div className='p-4 border-b border-border flex items-center justify-between'>
         <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
           Expert Agents

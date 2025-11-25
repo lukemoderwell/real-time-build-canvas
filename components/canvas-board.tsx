@@ -194,8 +194,8 @@ export function CanvasBoard({
             minY = Math.min(...groupNodes.map((n) => n.y));
             maxX = Math.max(...groupNodes.map((n) => n.x + n.width));
             maxY = Math.max(...groupNodes.map((n) => n.y + n.height));
-            width = maxX - minX + 40;
-            height = maxY - minY + 60;
+            width = maxX - minX + 60;
+            height = maxY - minY + 80;
           }
 
           const isBeingDragged = draggingGroup?.id === group.id;
@@ -204,28 +204,28 @@ export function CanvasBoard({
             <div
               key={group.id}
               className={cn(
-                'absolute rounded-2xl border-2 border-dashed group',
-                isBeingDragged ? 'transition-none' : 'transition-all duration-200'
+                'absolute rounded-3xl border transition-all duration-200 group backdrop-blur-[2px]',
+                isBeingDragged ? 'transition-none shadow-xl scale-[1.005]' : 'hover:shadow-md'
               )}
               style={{
-                left: minX - 20,
-                top: minY - 40,
+                left: minX - 30,
+                top: minY - 50,
                 width,
                 height,
-                borderColor: group.color,
-                backgroundColor: `${group.color}05`,
+                borderColor: `${group.color}66`, // ~40% opacity for clearer definition
+                backgroundColor: `${group.color}26`, // ~15% opacity for a clearly visible tint
                 pointerEvents: 'none', // Allow clicking through to canvas, but enable for children
                 willChange: isBeingDragged ? 'transform' : 'auto',
               }}
             >
-              <div className='absolute -top-6 left-4 flex items-center gap-2 pointer-events-auto'>
+              <div className='absolute -top-3 left-6 flex items-center gap-2 pointer-events-auto'>
                 {editingGroupId === group.id ? (
-                  <div className='flex items-center gap-1 bg-background border rounded-md shadow-sm overflow-hidden'>
+                  <div className='flex items-center gap-1 bg-background border rounded-full shadow-lg overflow-hidden px-1 py-1'>
                     <input
                       type='text'
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
-                      className='px-2 py-1 text-xs outline-none w-32 bg-transparent'
+                      className='px-3 py-1 text-xs font-semibold outline-none w-40 bg-transparent'
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter')
@@ -236,18 +236,19 @@ export function CanvasBoard({
                     />
                     <button
                       onClick={() => handleGroupRenameSubmit(group.id)}
-                      className='p-1 hover:bg-secondary text-green-500'
+                      className='p-1.5 hover:bg-secondary rounded-full text-green-500 transition-colors'
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Check size={12} />
+                      <Check size={14} />
                     </button>
                   </div>
                 ) : (
                   <div
-                    className='px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 cursor-grab active:cursor-grabbing hover:brightness-110 transition-all shadow-sm'
+                    className='px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-grab active:cursor-grabbing hover:brightness-110 transition-all shadow-md group-hover:shadow-lg'
                     style={{
                       backgroundColor: group.color,
                       color: '#fff',
+                      boxShadow: `0 4px 12px ${group.color}40`,
                     }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
@@ -257,8 +258,8 @@ export function CanvasBoard({
                   >
                     {group.name}
                     <Edit2
-                      size={10}
-                      className='opacity-0 group-hover:opacity-100 transition-opacity'
+                      size={12}
+                      className='opacity-50 group-hover:opacity-100 transition-opacity'
                     />
                   </div>
                 )}

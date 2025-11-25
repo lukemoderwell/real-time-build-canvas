@@ -101,15 +101,15 @@ ${thoughtsContext}
 Transcript: "${transcript}"
 
 Respond with JSON only:
-{"shouldRespond": true/false, "message": "short question or null", "thought": "reflection or null"}
+{"message": "short question or null", "thought": "your reflection or null"}
 
 Rules:
-- shouldRespond: true only if relevant to ${domain}
-- message: max 12 words, ask clarifying questions (or null)
-- thought: max 35 words, honest observation for your diary (or null)
+- message: Ask a clarifying question relevant to ${domain} (max 12 words), or null if nothing to ask
+- thought: Your honest observation from a ${agentRole} perspective (max 35 words), or null only if truly nothing relevant
+- Most transcripts should trigger a thought - you're always thinking about how this affects your domain
 - Don't repeat previous thoughts
 
-Example: {"shouldRespond": true, "message": "What's the data model?", "thought": "This needs careful API design."}`,
+Example: {"message": "What's the data model?", "thought": "This needs careful API design."}`,
     });
 
     let cleanText = text.trim();
@@ -130,10 +130,6 @@ Example: {"shouldRespond": true, "message": "What's the data model?", "thought":
       object = JSON.parse(cleanText);
     } catch {
       console.error(`[v0] JSON parse error for ${agentName}. Raw text:`, cleanText);
-      return { message: null, thought: null };
-    }
-
-    if (!object.shouldRespond) {
       return { message: null, thought: null };
     }
 

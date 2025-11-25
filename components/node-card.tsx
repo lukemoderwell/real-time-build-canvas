@@ -64,20 +64,20 @@ export function NodeCard({
       initial={{ opacity: 0, scale: 0.8, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={cn(
-        "absolute w-64 bg-card/95 border rounded-lg shadow-lg backdrop-blur-md cursor-pointer group overflow-hidden",
-        isDragging && "cursor-grabbing z-20 shadow-2xl transition-none",
-        !isDragging && "cursor-grab transition-all duration-150",
+        "absolute w-72 bg-card/90 border rounded-xl shadow-sm backdrop-blur-sm cursor-pointer group overflow-hidden",
+        isDragging && "cursor-grabbing z-20 shadow-2xl scale-105 transition-none",
+        !isDragging && "cursor-grab transition-all duration-200",
         isSelected
-          ? "border-primary ring-1 ring-primary shadow-primary/20 z-10"
-          : groupColor
-            ? `hover:border-primary/50 hover:shadow-xl`
-            : "border-border hover:border-primary/50 hover:shadow-xl",
+          ? "ring-2 ring-primary shadow-lg z-10"
+          : "hover:shadow-md hover:-translate-y-1",
       )}
       style={{
         left: node.x,
         top: node.y,
-        borderColor: groupColor || undefined,
-        boxShadow: groupColor ? `0 0 15px ${groupColor}30` : undefined,
+        borderColor: groupColor ? `${groupColor}66` : undefined, // ~40% opacity
+        background: groupColor 
+          ? `linear-gradient(to bottom right, ${groupColor}1A, var(--card))` // ~10% opacity start
+          : undefined,
         willChange: isDragging ? 'transform' : 'auto',
       }}
       onClick={(e) => {
@@ -90,20 +90,16 @@ export function NodeCard({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      whileHover={isDragging ? {} : { y: -4 }}
     >
-      {/* Top border accent with group color */}
-      {groupColor && <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: groupColor }} />}
-
       {/* Content */}
-      <div className="p-4 pt-5">
-        <h3 className="font-semibold text-sm mb-2 text-foreground leading-tight">{node.title}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">{node.description}</p>
+      <div className="p-5">
+        <h3 className="font-semibold text-sm mb-2 text-foreground leading-tight pr-6">{node.title}</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{node.description}</p>
       </div>
 
       {/* Selection Indicator */}
       {isSelected && (
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-3 right-3">
           <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-sm">
             <CheckCircle2 size={12} />
           </div>
