@@ -58,10 +58,15 @@ interface UseSpeechRecognitionProps {
   onError?: (error: string) => void
 }
 
+function checkSpeechRecognitionSupport(): boolean {
+  if (typeof window === "undefined") return false
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+}
+
 export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognitionProps = {}) {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState("")
-  const [isSupported, setIsSupported] = useState(false)
+  const [isSupported] = useState(() => checkSpeechRecognitionSupport())
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const isStartingRef = useRef(false)
 
@@ -70,7 +75,6 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
-      setIsSupported(true)
       const recognition = new SpeechRecognition()
       recognition.continuous = true
       recognition.interimResults = true
@@ -78,14 +82,12 @@ export function useSpeechRecognition({ onResult, onError }: UseSpeechRecognition
 
       recognition.onresult = (event) => {
         let interimTranscript = ""
-        let finalTranscript = ""
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const result = event.results[i]
           const text = result[0].transcript
 
           if (result.isFinal) {
-            finalTranscript += text
             if (onResult) onResult(text.trim(), true)
           } else {
             interimTranscript += text

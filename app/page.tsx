@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
@@ -9,7 +8,6 @@ import { ControlBar } from '@/components/control-bar';
 import { StatusPanel } from '@/components/status-panel';
 import { FeatureDetailsPanel } from '@/components/feature-details-panel';
 import { CodingAgentPanel } from '@/components/coding-agent-panel';
-import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +18,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Sparkles, Loader2 } from 'lucide-react';
-import type { Agent, NodeData, NodeGroup, TranscriptEntry } from '@/lib/types';
-import { generateId } from '@/lib/utils';
+import type { Agent, NodeData, NodeGroup } from '@/lib/types';
+import { generateId, mergeFeatureDetails } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
+import { useSpacebarRecording } from '@/hooks/use-spacebar-recording';
 import {
   generateAgentThoughts,
   generateBuildPrompt,
@@ -96,9 +94,6 @@ export default function Page() {
   } | null>(null);
   const [isTranscriptPanelOpen, setIsTranscriptPanelOpen] = useState(true);
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(true);
-  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>(
-    []
-  );
   const [currentSessionText, setCurrentSessionText] = useState('');
   const [fullTranscript, setFullTranscript] = useState('');
   const [buildPrompt, setBuildPrompt] = useState<string | null>(null);
@@ -111,8 +106,8 @@ export default function Page() {
 
   // Interval-based processing state
   const [transcriptBuffer, setTranscriptBuffer] = useState<string[]>([]);
-  const [processingIntervalMs] = useState(10000); // 10 seconds (reduced from 30s for faster updates)
-  const [autoAnalysisDelayMs] = useState(1500); // 1.5 seconds pause triggers auto-analysis
+  const processingIntervalMs = 10000; // 10 seconds
+  const autoAnalysisDelayMs = 1500; // 1.5 seconds pause triggers auto-analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const autoAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -254,10 +249,12 @@ export default function Page() {
         agents.map(async (agent) => {
           if (!agent.isEnabled) return;
 
+          const previousThoughts = agent.diaryEntries.map((entry) => entry.content);
           const response = await generateAgentThoughts(
             text,
             agent.role,
-            agent.name
+            agent.name,
+            previousThoughts
           );
 
           if (response.message) {
@@ -320,59 +317,78 @@ export default function Page() {
         );
 
         if (match.matchedGroupId && match.confidence >= 0.7) {
-          // Update existing feature group
+          // Update existing feature group and create nodes for new capabilities
+          const existingGroup = groups.find((g) => g.id === match.matchedGroupId);
+          const existingCapabilities = existingGroup?.keyCapabilities || [];
+          const existingNodeTitles = nodes
+            .filter((n) => n.groupId === match.matchedGroupId)
+            .map((n) => n.title.toLowerCase());
+
+          // Find new capabilities that don't have nodes yet
+          const newCapabilities = featureDetails.keyCapabilities.filter(
+            (cap) =>
+              !existingCapabilities.includes(cap) &&
+              !existingNodeTitles.includes(cap.toLowerCase())
+          );
+
+          // Create nodes for new capabilities
+          const newCapabilityNodes: NodeData[] =
+            newCapabilities.length > 0 && existingGroup
+              ? newCapabilities.map((capability, index) => ({
+                  id: generateId(),
+                  title: capability,
+                  description: '',
+                  groupId: match.matchedGroupId!,
+                  type: 'capability' as const,
+                  x: existingGroup.centroid.x + (index % 3) * 300 - 150,
+                  y: existingGroup.centroid.y + Math.floor(index / 3) * 180 + 200,
+                  width: 288,
+                  height: 160,
+                }))
+              : [];
+
+          if (newCapabilityNodes.length > 0) {
+            setNodes((prev) => [...prev, ...newCapabilityNodes]);
+          }
+
+          // Update group using helper
+          const conversation = { transcript: accumulatedText, reasoning: analysis.reasoning };
           setGroups((prev) =>
-            prev.map((g) => {
-              if (g.id === match.matchedGroupId) {
-                return {
-                  ...g,
-                  summary: featureDetails.summary || g.summary || '',
-                  userValue: featureDetails.userValue || g.userValue || '',
-                  keyCapabilities: [
-                    ...new Set([
-                      ...(g.keyCapabilities || []),
-                      ...featureDetails.keyCapabilities,
-                    ]),
-                  ],
-                  technicalApproach:
-                    featureDetails.technicalApproach || g.technicalApproach,
-                  openQuestions: [
-                    ...new Set([
-                      ...(g.openQuestions || []),
-                      ...featureDetails.openQuestions,
-                    ]),
-                  ],
-                  relatedFeatures: [
-                    ...new Set([
-                      ...(g.relatedFeatures || []),
-                      ...featureDetails.relatedFeatures,
-                    ]),
-                  ],
-                  conversationHistory: [
-                    ...(g.conversationHistory || []),
-                    {
-                      timestamp: new Date(),
-                      transcript: accumulatedText,
-                      insights: analysis.reasoning,
-                    },
-                  ],
-                };
-              }
-              return g;
-            })
+            prev.map((g) =>
+              g.id === match.matchedGroupId
+                ? mergeFeatureDetails(g, featureDetails, conversation, newCapabilityNodes.map((n) => n.id))
+                : g
+            )
           );
         } else {
           // Create new feature group with randomized position to avoid stacking
           const newGroupId = generateId();
+          const baseCentroid = {
+            x: 200 + Math.random() * 600,
+            y: 200 + Math.random() * 400,
+          };
+
+          // Create capability nodes from keyCapabilities
+          const capabilityNodes: NodeData[] = featureDetails.keyCapabilities.map(
+            (capability, index) => ({
+              id: generateId(),
+              title: capability,
+              description: '', // Brief description can be added later
+              groupId: newGroupId,
+              type: 'capability' as const,
+              x: baseCentroid.x + (index % 3) * 300 - 150,
+              y: baseCentroid.y + Math.floor(index / 3) * 180,
+              width: 288,
+              height: 160,
+            })
+          );
+
           const newGroup: NodeGroup = {
             id: newGroupId,
             name: featureDetails.name,
             color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-            nodeIds: [],
-            centroid: {
-              x: 200 + Math.random() * 600,
-              y: 200 + Math.random() * 400,
-            },
+            nodeIds: capabilityNodes.map((n) => n.id),
+            centroid: baseCentroid,
             summary: featureDetails.summary,
             userValue: featureDetails.userValue,
             keyCapabilities: featureDetails.keyCapabilities,
@@ -387,6 +403,11 @@ export default function Page() {
               },
             ],
           };
+
+          // Add capability nodes
+          if (capabilityNodes.length > 0) {
+            setNodes((prev) => [...prev, ...capabilityNodes]);
+          }
           setGroups((prev) => [...prev, newGroup]);
         }
       } else if (analysis.type === 'capability') {
@@ -487,7 +508,7 @@ export default function Page() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [transcriptBuffer, groups, processAgentFeedback]);
+  }, [transcriptBuffer, groups, nodes, processAgentFeedback]);
 
   const handleResult = useCallback(async (text: string, isFinal: boolean) => {
     if (!isFinal) {
@@ -516,104 +537,93 @@ export default function Page() {
     }
   }, []);
 
-  const {
-    isListening,
-    transcript,
-    startListening,
-    stopListening,
-    isSupported,
-  } = useSpeechRecognition({
+  const { isListening, startListening, stopListening } = useSpeechRecognition({
     onResult: handleResult,
   });
 
-  const toggleRecording = useCallback(async () => {
-    if (isListening) {
-      // When stopping, process any remaining transcript in buffer
-      if (transcriptBuffer.length > 0) {
-        await processAccumulatedTranscript();
-      }
-
-      // When stopping, create a new transcript entry if there's any text
-      if (currentSessionText.trim()) {
-        const newEntry: TranscriptEntry = {
-          id: generateId(),
-          speaker: 'me',
-          text: currentSessionText.trim(),
-          timestamp: Date.now(),
-        };
-        setTranscriptEntries((prev) => [...prev, newEntry]);
-        setCurrentSessionText('');
-        // Add a newline to full transcript when stopping
-        setFullTranscript((prev) => prev + '\n\n');
-      }
-      stopListening();
-    } else {
-      // Clear current session when starting new recording (but keep full transcript)
+  // Helper to stop recording with transcript processing
+  const handleStopRecording = useCallback(async () => {
+    if (currentSessionText.trim()) {
       setCurrentSessionText('');
-      startListening();
+      setFullTranscript((prev) => prev + '\n\n');
     }
-  }, [
+    stopListening();
+
+    if (transcriptBuffer.length > 0) {
+      await processAccumulatedTranscript();
+    }
+  }, [transcriptBuffer, processAccumulatedTranscript, currentSessionText, stopListening]);
+
+  // Helper to stop PTT recording with immediate analysis
+  const handleStopPTT = useCallback(async () => {
+    if (currentSessionText.trim()) {
+      setCurrentSessionText('');
+      setFullTranscript((prev) => prev + '\n\n');
+    }
+    stopListening();
+
+    // Small delay to allow final speech results to arrive
+    setTimeout(() => {
+      processAccumulatedTranscript();
+    }, 300);
+  }, [currentSessionText, stopListening, processAccumulatedTranscript]);
+
+  // Spacebar recording hook
+  const { recordingMode, toggleRecording } = useSpacebarRecording({
     isListening,
     startListening,
     stopListening,
-    currentSessionText,
-    transcriptBuffer,
-    processAccumulatedTranscript,
-  ]);
+    onStopRecording: handleStopRecording,
+    onStopPTT: handleStopPTT,
+  });
 
-  // Perform the actual deletion (called directly or after confirmation)
-  const performDelete = useCallback(() => {
+  // Delete only capabilities (used by backspace/delete key)
+  // This will NOT delete features - only removes capabilities from them
+  const handleDelete = useCallback(() => {
     if (selectedNodes.length === 0) return;
 
     setNodes((prev) => prev.filter((node) => !selectedNodes.includes(node.id)));
     setGroups((prev) =>
-      prev
-        .map((group) => ({
-          ...group,
-          nodeIds: group.nodeIds.filter((id) => !selectedNodes.includes(id)),
-        }))
-        .filter((group) => group.nodeIds.length > 0)
+      prev.map((group) => ({
+        ...group,
+        nodeIds: group.nodeIds.filter((id) => !selectedNodes.includes(id)),
+      }))
+      // Note: We no longer filter out empty groups here - features persist even when empty
     );
     setSelectedNodes([]);
-    setDeleteConfirmation({ isOpen: false, featuresToDelete: [] });
   }, [selectedNodes]);
 
-  // Check if deletion would remove features and show confirmation if needed
-  const handleDelete = useCallback(() => {
-    if (selectedNodes.length === 0) return;
+  // Perform feature deletion (called after confirmation)
+  const performFeatureDelete = useCallback(() => {
+    const featureIds = deleteConfirmation.featuresToDelete.map((f) => f.id);
 
-    // Find features (groups) that would be completely deleted
-    const featuresToDelete = groups.filter((group) => {
-      // Check if all nodes in this group are selected for deletion
-      const remainingNodes = group.nodeIds.filter(
-        (id) => !selectedNodes.includes(id)
-      );
-      return remainingNodes.length === 0 && group.nodeIds.length > 0;
-    });
-
-    // Also check for empty features that might be selected via their group
-    // (features with no capabilities that would be deleted)
-    const emptyFeaturesToDelete = groups.filter(
-      (group) => group.nodeIds.length === 0
+    // Delete all capabilities belonging to these features
+    setNodes((prev) =>
+      prev.filter((node) => !featureIds.includes(node.groupId))
     );
 
-    const allFeaturesToDelete = [...featuresToDelete, ...emptyFeaturesToDelete];
+    // Delete the features themselves
+    setGroups((prev) => prev.filter((group) => !featureIds.includes(group.id)));
 
-    if (allFeaturesToDelete.length > 0) {
-      // Show confirmation modal for feature deletion
-      setDeleteConfirmation({
-        isOpen: true,
-        featuresToDelete: allFeaturesToDelete,
-      });
-    } else {
-      // No features affected, delete capabilities directly
-      performDelete();
+    // Clear selection and close panel if the deleted feature was selected
+    if (selectedFeatureId && featureIds.includes(selectedFeatureId)) {
+      setSelectedFeatureId(null);
     }
-  }, [selectedNodes, groups, performDelete]);
 
+    setDeleteConfirmation({ isOpen: false, featuresToDelete: [] });
+  }, [deleteConfirmation.featuresToDelete, selectedFeatureId]);
+
+  // Request to delete a feature (shows confirmation modal)
+  const handleDeleteFeature = useCallback((feature: NodeGroup) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      featuresToDelete: [feature],
+    });
+  }, []);
+
+  // Delete key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if user is typing in an input
       const activeElement = document.activeElement;
       const isInput =
         activeElement instanceof HTMLInputElement ||
@@ -622,11 +632,6 @@ export default function Page() {
 
       if (isInput) return;
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
-        e.preventDefault();
-        toggleRecording();
-      }
-
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDelete();
       }
@@ -634,7 +639,7 @@ export default function Page() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleRecording, handleDelete]);
+  }, [handleDelete]);
 
   // Auto-analysis: Trigger analysis automatically after a pause in speech
   useEffect(() => {
@@ -718,10 +723,12 @@ export default function Page() {
 
           lastProcessedLength.set(agent.name, currentLength);
 
+          const previousThoughts = agent.diaryEntries.map((entry) => entry.content);
           const response = await generateAgentThoughts(
             fullTranscript,
             agent.role,
-            agent.name
+            agent.name,
+            previousThoughts
           );
 
           if (response.thought) {
@@ -878,6 +885,53 @@ export default function Page() {
     setSelectedFeatureId(groupId);
   };
 
+  // Create a new feature from a related feature name
+  const handleCreateRelatedFeature = useCallback((featureName: string) => {
+    // Check if a feature with this name already exists
+    const existingFeature = groups.find(
+      (g) => g.name.toLowerCase() === featureName.toLowerCase()
+    );
+
+    if (existingFeature) {
+      // If it exists, just open its details panel
+      setSelectedFeatureId(existingFeature.id);
+      return;
+    }
+
+    // Create a new feature group
+    const newGroupId = generateId();
+    const baseCentroid = {
+      x: 200 + Math.random() * 600,
+      y: 200 + Math.random() * 400,
+    };
+
+    const newGroup: NodeGroup = {
+      id: newGroupId,
+      name: featureName,
+      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+      nodeIds: [],
+      centroid: baseCentroid,
+      summary: '',
+      userValue: '',
+      keyCapabilities: [],
+      technicalApproach: undefined,
+      openQuestions: [],
+      relatedFeatures: [],
+      conversationHistory: [
+        {
+          timestamp: new Date(),
+          transcript: `Created from related feature link`,
+          insights: 'Feature created for exploration - describe it to add details',
+        },
+      ],
+    };
+
+    setGroups((prev) => [...prev, newGroup]);
+
+    // Open the new feature's details panel
+    setSelectedFeatureId(newGroupId);
+  }, [groups]);
+
   const handleToggleAgent = (agentId: string) => {
     setAgents((prev) =>
       prev.map((a) =>
@@ -901,49 +955,11 @@ export default function Page() {
           fullTranscript={fullTranscript}
           currentSessionText={currentSessionText}
           isRecording={isListening}
-          onManualAnalyze={processAccumulatedTranscript}
-          hasBufferedTranscript={transcriptBuffer.length > 0}
+          recordingMode={recordingMode}
           isAnalyzing={isAnalyzing}
           isMinimized={!isTranscriptPanelOpen}
           onToggleMinimize={() => setIsTranscriptPanelOpen((prev) => !prev)}
         />
-
-        {/* FAB for Analyze button when transcript is minimized */}
-        {!isTranscriptPanelOpen && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className='fixed bottom-28 left-8 z-30'
-          >
-            <Button
-              onClick={processAccumulatedTranscript}
-              disabled={transcriptBuffer.length === 0 || isAnalyzing}
-              size='lg'
-              className='rounded-full shadow-2xl h-14 w-14 p-0 flex items-center justify-center'
-              variant={
-                transcriptBuffer.length > 0 && !isAnalyzing
-                  ? 'default'
-                  : 'outline'
-              }
-            >
-              {isAnalyzing ? (
-                <Loader2 className='h-6 w-6 animate-spin' />
-              ) : (
-                <Sparkles className='h-6 w-6' />
-              )}
-            </Button>
-            {transcriptBuffer.length > 0 && !isAnalyzing && (
-              <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className='absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-popover border border-border rounded-lg px-3 py-2 shadow-lg whitespace-nowrap text-sm pointer-events-none'
-              >
-                Analyze transcript
-              </motion.div>
-            )}
-          </motion.div>
-        )}
 
         <CanvasBoard
           nodes={nodes}
@@ -956,6 +972,7 @@ export default function Page() {
           onGroupRename={handleGroupRename}
           onGroupClick={handleGroupClick}
           isRecording={isListening}
+          recordingMode={recordingMode}
           onToggleRecording={toggleRecording}
           isTranscriptPanelOpen={isTranscriptPanelOpen}
           onToggleTranscriptPanel={() =>
@@ -1005,6 +1022,8 @@ export default function Page() {
         feature={groups.find((g) => g.id === selectedFeatureId) || null}
         onClose={() => setSelectedFeatureId(null)}
         onSendToAgent={handleSendFeatureToAgent}
+        onDelete={handleDeleteFeature}
+        onCreateRelatedFeature={handleCreateRelatedFeature}
       />
 
       {/* Delete Feature Confirmation Modal */}
@@ -1043,7 +1062,7 @@ export default function Page() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={performDelete}
+              onClick={performFeatureDelete}
               className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
               Delete

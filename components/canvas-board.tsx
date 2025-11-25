@@ -28,6 +28,7 @@ interface CanvasBoardProps {
   onGroupDrag: (groupId: string, dx: number, dy: number) => void;
   onGroupClick: (groupId: string) => void;
   isRecording: boolean;
+  recordingMode?: 'idle' | 'ptt' | 'toggle';
   onToggleRecording: () => void;
   isTranscriptPanelOpen: boolean;
   onToggleTranscriptPanel: () => void;
@@ -46,6 +47,7 @@ export function CanvasBoard({
   onGroupDrag,
   onGroupClick,
   isRecording,
+  recordingMode = 'idle',
   onToggleRecording,
   isTranscriptPanelOpen,
   onToggleTranscriptPanel,
@@ -341,15 +343,27 @@ export function CanvasBoard({
           onClick={onToggleRecording}
           className={cn(
             'size-10 rounded-lg flex items-center justify-center transition-all duration-300 shadow-xl',
-            isRecording
+            isRecording && recordingMode === 'ptt'
+              ? 'bg-orange-500 text-white'
+              : isRecording && recordingMode === 'toggle'
               ? 'bg-red-500 text-white hover:bg-red-600'
               : 'bg-white text-black hover:bg-gray-100 border border-border'
           )}
+          title={
+            isRecording
+              ? recordingMode === 'ptt'
+                ? 'Release spacebar to stop'
+                : 'Tap spacebar to stop'
+              : 'Hold spacebar for PTT, double-tap to toggle'
+          }
         >
           {isRecording ? (
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+              transition={{
+                repeat: Number.POSITIVE_INFINITY,
+                duration: recordingMode === 'ptt' ? 0.5 : 1.5,
+              }}
             >
               <StopCircle size={20} />
             </motion.div>

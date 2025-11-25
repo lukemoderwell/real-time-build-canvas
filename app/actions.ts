@@ -68,93 +68,48 @@ Please implement these features with:
 export async function generateAgentThoughts(
   transcript: string,
   agentRole: string,
-  agentName: string
+  agentName: string,
+  previousThoughts: string[] = []
 ): Promise<{ message: string | null; thought: string | null }> {
   try {
-    const roleContext = {
-      designer: {
-        domain:
-          'UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns, design systems, prototyping',
-        messageStyle:
-          "Ask clarifying questions about user needs, visual requirements, or interaction patterns. Challenge vague requirements. Example: 'How should this look on mobile?' or 'Do we want this to feel playful or professional?'",
-        thoughtStyle:
-          "Private concerns about design feasibility, user experience implications, visual coherence, or missing specs. Be honest and critical. Example: 'They haven't mentioned mobile at all - this could be a disaster on small screens' or 'Love this direction, reminds me of the Stripe dashboard feel'",
-      },
-      backend: {
-        domain:
-          'APIs, databases, data models, authentication, authorization, security, performance, scalability, integrations, business logic',
-        messageStyle:
-          "Ask technical questions about data structure, security, scale, or implementation complexity. Flag potential issues. Example: 'What's the data model for this?' or 'How are we handling authentication here?'",
-        thoughtStyle:
-          "Private technical concerns, complexity estimates, security risks, or architectural decisions. Be realistic about challenges. Example: 'This is going to need real-time updates - websockets or polling?' or 'They're underestimating how complex this auth flow will be'",
-      },
-      cloud: {
-        domain:
-          'Infrastructure, deployment, hosting, CI/CD, auth providers (Auth0, Clerk, Supabase), cloud services (AWS, Vercel, Railway), monitoring, DevOps, scaling',
-        messageStyle:
-          "Ask about infrastructure needs, auth providers, hosting requirements, or deployment strategy. Example: 'Should we use Clerk or Supabase for auth?' or 'What's our hosting strategy?'",
-        thoughtStyle:
-          "Private concerns about infrastructure costs, deployment complexity, service choices, or scaling considerations. Example: 'If they want real-time, we'll need websockets - that rules out static hosting' or 'Vercel would be perfect for this, unless they need long-running tasks'",
-      },
-      visionary: {
-        domain:
-          "Product vision, user experience philosophy, simplicity, quality, innovation, market disruption, design thinking, the 'why' behind features",
-        messageStyle:
-          "Challenge the team to think bigger and focus on quality. Ask WHY we're building this and if it's simple enough. Push for excellence. Example: 'Why does the user need this?' or 'Can we make this simpler?' or 'Is this insanely great?'",
-        thoughtStyle:
-          "Brutally honest observations about whether we're settling for mediocrity, missing the bigger picture, or adding complexity. Question if this is truly innovative. Example: 'This feels like every other dashboard. Where's the magic?' or 'Finally, something that could actually change how people work' or 'Too many features. We need to cut half of these.'",
-      },
+    const roleDomains: Record<string, string> = {
+      designer: 'UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns',
+      backend: 'APIs, databases, authentication, security, performance, scalability',
+      cloud: 'Infrastructure, deployment, CI/CD, cloud services (AWS, Vercel), DevOps',
+      visionary: 'Product vision, simplicity, quality, innovation, the "why" behind features',
     };
 
-    const context = roleContext[agentRole as keyof typeof roleContext];
-
-    if (!context) {
-      console.log(`[v0] No role context found for role: ${agentRole}`);
+    const domain = roleDomains[agentRole];
+    if (!domain) {
+      console.log(`[v0] No domain found for role: ${agentRole}`);
       return { message: null, thought: null };
     }
 
+    // Build context from previous thoughts (last 5 to keep prompt size reasonable)
+    const recentThoughts = previousThoughts.slice(-5);
+    const thoughtsContext =
+      recentThoughts.length > 0
+        ? `\n\nYOUR PREVIOUS DIARY ENTRIES (avoid repeating these ideas):
+${recentThoughts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
+        : '';
+
     const { text } = await generateText({
       model: `openai/${models.small}`,
-      prompt: `You are ${agentName}, a ${agentRole} engineer listening to a product brainstorming session.
+      prompt: `You are ${agentName}, a ${agentRole} expert in a product brainstorming session.
+${thoughtsContext}
 
-Domain expertise: ${context.domain}
+Transcript: "${transcript}"
 
-Someone just said: "${transcript}"
+Respond with JSON only:
+{"shouldRespond": true/false, "message": "short question or null", "thought": "reflection or null"}
 
-Your response has TWO parts:
+Rules:
+- shouldRespond: true only if relevant to ${domain}
+- message: max 12 words, ask clarifying questions (or null)
+- thought: max 35 words, honest observation for your diary (or null)
+- Don't repeat previous thoughts
 
-1. PUBLIC MESSAGE (optional): ${context.messageStyle}
-   - Only respond if this is relevant to your domain
-   - Keep it SHORT (max 12 words)
-   - Mostly ASK QUESTIONS to clarify requirements
-   - Sometimes offer brief insights or flag concerns
-   - Sound natural and conversational
-   - If not relevant to your domain, don't say anything
-
-2. PRIVATE THOUGHT (optional): ${context.thoughtStyle}
-   - Personal reflection for your own diary
-   - Can be longer (max 35 words)
-   - Be honest, critical, and realistic
-   - Include concerns, observations, or excitement
-   - Not everything needs a thought - only if you have something meaningful to note
-
-Return ONLY this JSON (no markdown):
-{
-  "shouldRespond": boolean (true if relevant to your domain),
-  "message": "question or brief insight" or null,
-  "thought": "honest private reflection" or null
-}
-
-Examples of GOOD responses:
-- Designer hearing "user dashboard": {"shouldRespond": true, "message": "What's the main action users take here?", "thought": "Dashboard could mean anything. Need to see user flows before I can design anything useful."}
-- Backend hearing "auth": {"shouldRespond": true, "message": "Are we doing social login or email/password?", "thought": "Auth is always more complex than they think. Magic links? 2FA? Need to pin this down early."}
-- Cloud hearing "deployment": {"shouldRespond": true, "message": "Vercel or self-hosted?", "thought": "If they want WebSockets we can't use Vercel. Need to understand the real-time requirements first."}
-- Visionary hearing "admin panel with lots of features": {"shouldRespond": true, "message": "Why do they need all these features?", "thought": "We're building feature soup again. What's the ONE thing users desperately need? Start there."}
-- Visionary hearing "landing page": {"shouldRespond": true, "message": "What feeling should users get when they see it?", "thought": "This is our first impression. It needs to be unforgettable. Can't just be another gradient hero section."}
-
-Examples of responses to IGNORE (not your domain):
-- Designer hearing "database schema": {"shouldRespond": false, "message": null, "thought": null}
-- Backend hearing "color palette": {"shouldRespond": false, "message": null, "thought": null}`,
+Example: {"shouldRespond": true, "message": "What's the data model?", "thought": "This needs careful API design."}`,
     });
 
     let cleanText = text.trim();
@@ -170,7 +125,13 @@ Examples of responses to IGNORE (not your domain):
       cleanText = cleanText.substring(jsonStart, jsonEnd);
     }
 
-    const object = JSON.parse(cleanText);
+    let object;
+    try {
+      object = JSON.parse(cleanText);
+    } catch {
+      console.error(`[v0] JSON parse error for ${agentName}. Raw text:`, cleanText);
+      return { message: null, thought: null };
+    }
 
     if (!object.shouldRespond) {
       return { message: null, thought: null };
@@ -181,7 +142,7 @@ Examples of responses to IGNORE (not your domain):
       thought: object.thought || null,
     };
   } catch (error) {
-    console.log(`[v0] Error generating thoughts for ${agentName}:`, error);
+    console.error(`[v0] Error generating thoughts for ${agentName}:`, error);
     return { message: null, thought: null };
   }
 }

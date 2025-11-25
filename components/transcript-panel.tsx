@@ -2,15 +2,13 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
-import { Button } from './ui/button';
-import { Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TranscriptPanelProps {
   fullTranscript: string;
   currentSessionText: string;
   isRecording: boolean;
-  onManualAnalyze?: () => void;
-  hasBufferedTranscript?: boolean;
+  recordingMode?: 'idle' | 'ptt' | 'toggle';
   isAnalyzing?: boolean;
   isMinimized?: boolean;
   onToggleMinimize?: () => void;
@@ -20,8 +18,7 @@ export function TranscriptPanel({
   fullTranscript,
   currentSessionText,
   isRecording,
-  onManualAnalyze,
-  hasBufferedTranscript = false,
+  recordingMode = 'idle',
   isAnalyzing = false,
   isMinimized = false,
   onToggleMinimize,
@@ -66,10 +63,12 @@ export function TranscriptPanel({
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{
                 repeat: Number.POSITIVE_INFINITY,
-                duration: 1.5,
+                duration: recordingMode === 'ptt' ? 0.5 : 1.5,
                 ease: 'easeInOut',
               }}
-              className='w-2 h-2 bg-red-500 rounded-full'
+              className={`w-2 h-2 rounded-full ${
+                recordingMode === 'ptt' ? 'bg-orange-500' : 'bg-red-500'
+              }`}
             />
           </div>
         )}
@@ -90,12 +89,16 @@ export function TranscriptPanel({
                 animate={{ opacity: [0.5, 1, 0.5] }}
                 transition={{
                   repeat: Number.POSITIVE_INFINITY,
-                  duration: 1.5,
+                  duration: recordingMode === 'ptt' ? 0.5 : 1.5,
                   ease: 'easeInOut',
                 }}
-                className='w-2 h-2 bg-red-500 rounded-full'
+                className={`w-2 h-2 rounded-full ${
+                  recordingMode === 'ptt' ? 'bg-orange-500' : 'bg-red-500'
+                }`}
               />
-              <span className='text-[10px] text-muted-foreground'>Recording</span>
+              <span className='text-[10px] text-muted-foreground'>
+                {recordingMode === 'ptt' ? 'Push-to-Talk' : 'Recording'}
+              </span>
             </div>
           )}
           {onToggleMinimize && (
@@ -132,33 +135,13 @@ export function TranscriptPanel({
         )}
       </div>
 
-      {/* Manual Analysis Button */}
-      {onManualAnalyze && (
-        <div className='p-4 border-t border-border bg-background/50'>
-          <Button
-            onClick={onManualAnalyze}
-            disabled={!hasBufferedTranscript || isAnalyzing}
-            className='w-full flex items-center justify-center gap-2'
-            variant={hasBufferedTranscript && !isAnalyzing ? 'default' : 'outline'}
-            size='sm'
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Sparkles className='h-4 w-4' />
-                {hasBufferedTranscript ? 'Analyze' : 'No new transcript'}
-              </>
-            )}
-          </Button>
-          {hasBufferedTranscript && !isAnalyzing && (
-            <p className='text-xs text-muted-foreground text-center mt-2'>
-              Click to analyze and create features
-            </p>
-          )}
+      {/* Analyzing Indicator */}
+      {isAnalyzing && (
+        <div className='p-3 border-t border-border bg-background/50'>
+          <div className='flex items-center justify-center gap-2 text-sm text-muted-foreground'>
+            <Loader2 className='h-4 w-4 animate-spin' />
+            <span>Analyzing transcript...</span>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Terminal } from 'lucide-react';
+import { X, Terminal, Trash2, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { NodeGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,16 @@ interface FeatureDetailsPanelProps {
   feature: NodeGroup | null;
   onClose: () => void;
   onSendToAgent?: (feature: NodeGroup) => void;
+  onDelete?: (feature: NodeGroup) => void;
+  onCreateRelatedFeature?: (featureName: string) => void;
 }
 
 export function FeatureDetailsPanel({
   feature,
   onClose,
   onSendToAgent,
+  onDelete,
+  onCreateRelatedFeature,
 }: FeatureDetailsPanelProps) {
   return (
     <AnimatePresence>
@@ -50,6 +54,16 @@ export function FeatureDetailsPanel({
             >
               <Terminal className="h-4 w-4" />
               <span>Build</span>
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              onClick={() => onDelete(feature)}
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
           <Button
@@ -175,8 +189,16 @@ export function FeatureDetailsPanel({
               </h3>
               <div className="flex flex-wrap gap-2">
                 {feature.relatedFeatures.map((related, idx) => (
-                  <Badge key={idx} variant="outline" className="text-xs">
+                  <Badge
+                    key={idx}
+                    variant="outline"
+                    className={`text-xs ${onCreateRelatedFeature ? 'cursor-pointer hover:bg-primary/10 hover:border-primary transition-colors group' : ''}`}
+                    onClick={() => onCreateRelatedFeature?.(related)}
+                  >
                     {related}
+                    {onCreateRelatedFeature && (
+                      <Plus className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
                   </Badge>
                 ))}
               </div>
