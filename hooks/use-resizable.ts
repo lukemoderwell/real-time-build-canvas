@@ -23,22 +23,28 @@ export function useResizable({
   direction,
   storageKey,
 }: UseResizableOptions): UseResizableReturn {
-  const [width, setWidth] = useState(() => {
-    if (storageKey && typeof window !== 'undefined') {
+  // Always initialize with initialWidth to match server render and avoid hydration mismatch
+  const [width, setWidth] = useState(initialWidth);
+  const [isResizing, setIsResizing] = useState(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const hasHydrated = useRef(false);
+
+  // Load from localStorage after hydration to avoid SSR mismatch
+  useEffect(() => {
+    if (hasHydrated.current) return;
+    hasHydrated.current = true;
+
+    if (storageKey) {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = parseInt(stored, 10);
         if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
-          return parsed;
+          setWidth(parsed);
         }
       }
     }
-    return initialWidth;
-  });
-
-  const [isResizing, setIsResizing] = useState(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(0);
+  }, [storageKey, minWidth, maxWidth]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
