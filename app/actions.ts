@@ -1,6 +1,6 @@
 'use server';
 
-import { models } from '@/lib/models';
+import { DEFAULT_MODELS } from '@/lib/models';
 import { generateText } from 'ai';
 import Tembo from '@tembo-io/sdk';
 
@@ -36,7 +36,8 @@ export async function sendToTembo(
 }
 
 export async function generateBuildPrompt(
-  nodes: Array<{ title: string; content: string; type: string }>
+  nodes: Array<{ title: string; content: string; type: string }>,
+  modelId: string = DEFAULT_MODELS.medium
 ): Promise<string> {
   try {
     const nodesText = nodes
@@ -48,7 +49,7 @@ ${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
       .join('\n');
 
     const { text } = await generateText({
-      model: `openai/${models.medium}`,
+      model: modelId,
       prompt: `You are a pragmatic design engineer focused on building MVPs - minimum viable implementations that prove a concept works.
 
 You've been given the following requirements:
@@ -98,7 +99,8 @@ export async function generateAgentThoughts(
   transcript: string,
   agentRole: string,
   agentName: string,
-  previousThoughts: string[] = []
+  previousThoughts: string[] = [],
+  modelId: string = DEFAULT_MODELS.small
 ): Promise<{ message: string | null; thought: string | null }> {
   try {
     const roleDomains: Record<string, string> = {
@@ -127,7 +129,7 @@ ${recentThoughts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
         : '';
 
     const { text } = await generateText({
-      model: `openai/${models.small}`,
+      model: modelId,
       prompt: `You are ${agentName}, a ${agentRole} expert in a product brainstorming session.
 ${thoughtsContext}
 
@@ -183,7 +185,8 @@ Example: {"message": "What's the data model?", "thought": "This needs careful AP
 
 export async function analyzeTranscript(
   transcript: string,
-  existingGroups: Array<{ id: string; name: string; summary: string }>
+  existingGroups: Array<{ id: string; name: string; summary: string }>,
+  modelId: string = DEFAULT_MODELS.medium
 ): Promise<{
   type: 'feature' | 'capability' | 'noise';
   confidence: number;
@@ -198,7 +201,7 @@ export async function analyzeTranscript(
         : '';
 
     const { text: result } = await generateText({
-      model: `openai/${models.medium}`,
+      model: modelId,
       prompt: `You are analyzing a product conversation to determine if someone is discussing a HIGH-LEVEL FEATURE or a SPECIFIC CAPABILITY.
 
 DEFINITIONS:
@@ -261,7 +264,8 @@ Respond with ONLY this JSON (no markdown):
 
 export async function extractFeatureDetails(
   transcript: string,
-  conversationHistory: string[]
+  conversationHistory: string[],
+  modelId: string = DEFAULT_MODELS.medium
 ): Promise<{
   name: string;
   summary: string;
@@ -278,7 +282,7 @@ export async function extractFeatureDetails(
         : '';
 
     const { text: result } = await generateText({
-      model: `openai/${models.medium}`,
+      model: modelId,
       prompt: `You are a product manager extracting feature requirements from a natural conversation.
 
 CURRENT TRANSCRIPT: "${transcript}"${historyContext}
@@ -360,7 +364,8 @@ export async function findMatchingFeature(
     name: string;
     summary: string;
     keyCapabilities: string[];
-  }>
+  }>,
+  modelId: string = DEFAULT_MODELS.medium
 ): Promise<{
   matchedGroupId: string | null;
   confidence: number;
@@ -385,7 +390,7 @@ export async function findMatchingFeature(
       .join('\n\n');
 
     const { text: result } = await generateText({
-      model: `openai/${models.medium}`,
+      model: modelId,
       prompt: `You are matching a new capability to an existing feature group.
 
 TRANSCRIPT: "${transcript}"
@@ -437,11 +442,12 @@ If confidence is below 0.7, return null - better to create a new feature than mi
 }
 
 export async function extractCapabilityDetails(
-  transcript: string
+  transcript: string,
+  modelId: string = DEFAULT_MODELS.small
 ): Promise<{ title: string; description: string }> {
   try {
     const { text: result } = await generateText({
-      model: `openai/${models.small}`,
+      model: modelId,
       prompt: `Extract a capability from this transcript.
 
 TRANSCRIPT: "${transcript}"

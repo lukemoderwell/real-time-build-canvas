@@ -28,6 +28,7 @@ import {
 } from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useSpacebarRecording } from '@/hooks/use-spacebar-recording';
+import { useModelSettings } from '@/hooks/use-model-settings';
 import {
   generateAgentThoughts,
   generateBuildPrompt,
@@ -94,6 +95,7 @@ export default function Page() {
   const [groups, setGroups] = useState<NodeGroup[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
+  const { models, updateModel } = useModelSettings();
   const [activeFeedback, setActiveFeedback] = useState<{
     agentId: string;
     message: string;
@@ -276,7 +278,8 @@ export default function Page() {
             text,
             agent.role,
             agent.name,
-            previousThoughts
+            previousThoughts,
+            models.small
           );
 
           if (response.message) {
@@ -289,7 +292,7 @@ export default function Page() {
         })
       );
     },
-    [agents, addAgentThought, triggerAgentFeedback]
+    [agents, addAgentThought, triggerAgentFeedback, models.small]
   );
 
   const processAccumulatedTranscript = useCallback(async () => {
@@ -310,7 +313,8 @@ export default function Page() {
           id: g.id,
           name: g.name,
           summary: g.summary || '',
-        }))
+        })),
+        models.medium
       );
 
       if (analysis.type === 'noise' && analysis.confidence > 0.85) {
@@ -328,7 +332,8 @@ export default function Page() {
         // Extract feature details
         const featureDetails = await extractFeatureDetails(
           accumulatedText,
-          transcriptBuffer
+          transcriptBuffer,
+          models.medium
         );
 
         // Check if feature already exists (semantic matching)
@@ -339,7 +344,8 @@ export default function Page() {
             name: g.name,
             summary: g.summary || '',
             keyCapabilities: g.keyCapabilities || [],
-          }))
+          })),
+          models.medium
         );
 
         if (match.matchedGroupId && match.confidence >= 0.7) {
@@ -472,13 +478,16 @@ export default function Page() {
             name: g.name,
             summary: g.summary || '',
             keyCapabilities: g.keyCapabilities || [],
-          }))
+          })),
+          models.medium
         );
 
         if (match.matchedGroupId && match.confidence >= 0.7) {
           // Extract capability details
-          const capabilityDetails =
-            await extractCapabilityDetails(accumulatedText);
+          const capabilityDetails = await extractCapabilityDetails(
+            accumulatedText,
+            models.small
+          );
 
           // Find the group's centroid for positioning
           const targetGroup = groups.find((g) => g.id === match.matchedGroupId);
@@ -535,7 +544,8 @@ export default function Page() {
           // No matching feature - treat as new feature instead
           const featureDetails = await extractFeatureDetails(
             accumulatedText,
-            transcriptBuffer
+            transcriptBuffer,
+            models.medium
           );
 
           const newGroup: NodeGroup = {
@@ -574,7 +584,7 @@ export default function Page() {
       isAnalyzingRef.current = false;
       setIsAnalyzing(false);
     }
-  }, [transcriptBuffer, groups, nodes, processAgentFeedback]);
+  }, [transcriptBuffer, groups, nodes, processAgentFeedback, models.medium, models.small]);
 
   const handleResult = useCallback(async (text: string, isFinal: boolean) => {
     if (!isFinal) {
@@ -815,7 +825,8 @@ export default function Page() {
             fullTranscript,
             agent.role,
             agent.name,
-            previousThoughts
+            previousThoughts,
+            models.small
           );
 
           if (response.thought) {
@@ -829,7 +840,7 @@ export default function Page() {
     return () => {
       intervalIds.forEach((id) => clearInterval(id));
     };
-  }, [agents, fullTranscript, addAgentThought]);
+  }, [agents, fullTranscript, addAgentThought, models.small]);
 
   const handleNodeSelect = (id: string) => {
     setSelectedNodes((prev) =>
@@ -903,7 +914,8 @@ export default function Page() {
           title: node.title,
           content: node.description,
           type: node.type,
-        }))
+        })),
+        models.medium
       );
       setBuildPrompt(prompt);
       setIsPromptDialogOpen(true);
@@ -948,7 +960,8 @@ export default function Page() {
           title: node.title,
           content: node.description,
           type: node.type,
-        }))
+        })),
+        models.medium
       );
       setBuildPrompt(prompt);
     } catch (error) {
@@ -1116,6 +1129,8 @@ export default function Page() {
         onCrossOffDiaryEntry={handleCrossOffDiaryEntry}
         isMinimized={!isAgentSidebarOpen}
         onToggleMinimize={() => setIsAgentSidebarOpen((prev) => !prev)}
+        modelSettings={models}
+        onModelChange={updateModel}
       />
 
       {/* Feature Details Panel */}

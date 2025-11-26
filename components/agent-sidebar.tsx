@@ -22,9 +22,23 @@ import {
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useResizable } from '@/hooks/use-resizable';
 import { ResizeHandle } from '@/components/resize-handle';
 import { ThemeToggle } from '@/components/theme-toggle';
+import {
+  type ModelSettings,
+  type ModelTier,
+  getModelsByTier,
+  getModelName,
+} from '@/lib/models';
 
 interface AgentSidebarProps {
   agents: Agent[];
@@ -35,6 +49,8 @@ interface AgentSidebarProps {
   onCrossOffDiaryEntry: (agentId: string, entryId: string) => void;
   isMinimized?: boolean;
   onToggleMinimize?: () => void;
+  modelSettings?: ModelSettings;
+  onModelChange?: (tier: ModelTier, modelId: string) => void;
 }
 
 export function AgentSidebar({
@@ -46,6 +62,8 @@ export function AgentSidebar({
   onCrossOffDiaryEntry,
   isMinimized = false,
   onToggleMinimize,
+  modelSettings,
+  onModelChange,
 }: AgentSidebarProps) {
   const enabledAgents = agents.filter((a) => a.isEnabled);
   const { width, isResizing, handleMouseDown } = useResizable({
@@ -130,6 +148,42 @@ export function AgentSidebar({
                     </div>
                   ))}
                 </div>
+
+                {modelSettings && onModelChange && (
+                  <>
+                    <Separator className='my-4' />
+                    <div className='space-y-2'>
+                      <h4 className='font-medium leading-none'>AI Models</h4>
+                      <p className='text-xs text-muted-foreground'>
+                        Select models for different task types.
+                      </p>
+                    </div>
+                    <div className='space-y-3 mt-3'>
+                      {(['small', 'medium', 'large'] as const).map((tier) => (
+                        <div key={tier} className='space-y-1'>
+                          <Label className='text-xs capitalize'>{tier} Tasks</Label>
+                          <Select
+                            value={modelSettings[tier]}
+                            onValueChange={(value) => onModelChange(tier, value)}
+                          >
+                            <SelectTrigger className='h-8 text-xs'>
+                              <SelectValue>
+                                {getModelName(modelSettings[tier])}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getModelsByTier(tier).map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </PopoverContent>
           </Popover>
