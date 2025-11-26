@@ -32,7 +32,6 @@ export function FeatureDetailsPanel({
     minWidth: 300,
     maxWidth: 600,
     direction: 'left',
-    storageKey: 'feature-panel-width',
   });
 
   return (

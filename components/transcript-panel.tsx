@@ -35,7 +35,6 @@ export function TranscriptPanel({
     minWidth: 200,
     maxWidth: 500,
     direction: 'right',
-    storageKey: 'transcript-panel-width',
   });
 
   // Sync resize width changes back to parent

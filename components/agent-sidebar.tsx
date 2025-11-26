@@ -44,7 +44,6 @@ export function AgentSidebar({
     minWidth: 200,
     maxWidth: 500,
     direction: 'left',
-    storageKey: 'agent-sidebar-width',
   });
 
   if (isMinimized) {
