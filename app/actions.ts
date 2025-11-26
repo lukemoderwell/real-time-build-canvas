@@ -2,6 +2,38 @@
 
 import { models } from '@/lib/models';
 import { generateText } from 'ai';
+import Tembo from '@tembo-io/sdk';
+
+// Send a build prompt to Tembo
+export async function sendToTembo(
+  prompt: string,
+  agent: string
+): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  try {
+    const apiKey = process.env.TEMBO_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: 'TEMBO_API_KEY is not configured' };
+    }
+
+    const client = new Tembo({ apiKey });
+    const task = await client.task.create({
+      prompt,
+      agent,
+      repositories: process.env.TEMBO_REPOSITORY_URL
+        ? [process.env.TEMBO_REPOSITORY_URL]
+        : undefined,
+      queueRightAway: true,
+    });
+
+    return { success: true, taskId: task.id };
+  } catch (error) {
+    console.error('Error sending to Tembo:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
 
 export async function generateBuildPrompt(
   nodes: Array<{ title: string; content: string; type: string }>
@@ -17,24 +49,38 @@ ${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
 
     const { text } = await generateText({
       model: `openai/${models.medium}`,
-      prompt: `You are a best-in-class design engineer tasked with building a feature set based on product requirements.
+      prompt: `You are a pragmatic design engineer focused on building MVPs - minimum viable implementations that prove a concept works.
 
 You've been given the following requirements:
 
 ${nodesText}
 
-Your job is to write a comprehensive, detailed prompt that a coding agent can use to build exactly what's been specified. The prompt should:
+Your job is to write a focused prompt that a coding agent can use to build an MVP version of this feature. The goal is SPEED - get something working fast so we can see it and iterate.
 
-1. Be clear, specific, and actionable
-2. Include all technical details needed for implementation
-3. Specify the tech stack preferences if mentioned
-4. Include UI/UX requirements if specified
-5. Include business logic and rules if specified
-6. Be formatted in a way that a coding agent can execute immediately
-7. Group related requirements logically
-8. Include any edge cases or constraints mentioned
+CRITICAL MVP PRINCIPLES:
+- Strip down to the CORE functionality only - what's the simplest version that proves the concept?
+- One happy path - skip edge cases, error handling can come later
+- Prefer simple over complex - if there's a simpler way to achieve 80% of the value, do that
+- Mock expensive integrations - use fake data, stub APIs, skip auth unless critical
+- No polish - functional > pretty, we'll refine later
+- Defer complexity - note what you're skipping but don't build it
 
-Write the prompt as if you're briefing a senior developer. Be thorough but concise. Focus on what needs to be built, not how to build it (let the coding agent figure that out).
+WHAT TO AVOID IN MVP:
+- Real-time sync (use polling or manual refresh)
+- Complex authentication (use simple auth or skip entirely)
+- Elaborate error handling (console.log is fine for now)
+- Performance optimization
+- Comprehensive validation
+- External API integrations (mock them)
+
+The prompt should:
+1. Be clear and actionable
+2. Explicitly state this is an MVP
+3. List what's IN scope (minimal)
+4. List what's deliberately OUT of scope (to add later)
+5. Focus on demonstrating the feature works
+
+Write the prompt as if briefing a developer who needs to ship something in hours, not days. Be direct. Focus on what to build NOW.
 
 Output ONLY the prompt text, no markdown formatting, no explanations.`,
       maxOutputTokens: 2000,
@@ -53,15 +99,20 @@ ${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
       )
       .join('\n');
 
-    return `You are a best-in-class design engineer. Build the following requirements:
+    return `BUILD AN MVP - Focus on speed, not perfection.
 
+Requirements:
 ${nodesText}
 
-Please implement these features with:
-- Clean, maintainable code
-- Proper error handling
-- Responsive design where applicable
-- Following best practices for the chosen tech stack`;
+MVP RULES:
+- Build the simplest version that proves the concept works
+- One happy path only - skip edge cases
+- Mock external APIs and integrations
+- Skip auth unless absolutely critical
+- Functional > pretty - no polish needed
+- Note what you're skipping for later
+
+Ship something working in hours, not days.`;
   }
 }
 

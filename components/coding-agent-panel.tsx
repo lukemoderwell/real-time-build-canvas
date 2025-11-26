@@ -2,9 +2,13 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Copy, Check, Terminal } from 'lucide-react';
+import { X, Copy, Check, Terminal, Send, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
+import { sendToTembo } from '@/app/actions';
+import { TEMBO_AGENTS } from '@/lib/tembo';
+
+type TemboStatus = 'idle' | 'sending' | 'sent' | 'error';
 
 interface CodingAgentPanelProps {
   prompt: string | null;
@@ -30,6 +34,9 @@ export function CodingAgentPanel({
   onPositionUpdate,
 }: CodingAgentPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState(TEMBO_AGENTS[0].id);
+  const [temboStatus, setTemboStatus] = useState<TemboStatus>('idle');
+  const [temboError, setTemboError] = useState<string | null>(null);
   const dragStartPos = useRef({ x: 0, y: 0 });
   const panelStartPos = useRef({ x: 0, y: 0 });
 
@@ -56,6 +63,24 @@ export function CodingAgentPanel({
   const handleMouseUp = () => {
     if (isDragging) {
       setIsDragging(false);
+    }
+  };
+
+  const handleSendToTembo = async () => {
+    if (!prompt) return;
+
+    setTemboStatus('sending');
+    setTemboError(null);
+
+    const result = await sendToTembo(prompt, selectedAgent);
+
+    if (result.success) {
+      setTemboStatus('sent');
+      // Reset status after 3 seconds
+      setTimeout(() => setTemboStatus('idle'), 3000);
+    } else {
+      setTemboStatus('error');
+      setTemboError(result.error || 'Failed to send to Tembo');
     }
   };
 
@@ -125,28 +150,84 @@ export function CodingAgentPanel({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 p-4 border-t border-border bg-background/50">
-        <Button
-          variant="outline"
-          onClick={onCopy}
-          className="flex items-center gap-2"
-          disabled={isGenerating || !prompt}
-        >
-          {copied ? (
-            <>
-              <Check size={16} />
-              Copied!
-            </>
-          ) : (
-            <>
-              <Copy size={16} />
-              Copy Prompt
-            </>
-          )}
-        </Button>
-        <Button onClick={onClose}>Close</Button>
+      <div className="p-4 border-t border-border bg-background/50 space-y-3">
+        {/* Agent selector */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="agent-select" className="text-sm text-muted-foreground">
+            Agent:
+          </label>
+          <select
+            id="agent-select"
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="flex-1 h-9 px-3 rounded-md border border-input bg-background text-sm"
+            disabled={isGenerating || !prompt || temboStatus === 'sending'}
+          >
+            {TEMBO_AGENTS.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status message */}
+        {temboStatus === 'sent' && (
+          <div className="text-sm text-green-600 flex items-center gap-2">
+            <Check size={16} />
+            Sent to Tembo!
+          </div>
+        )}
+        {temboStatus === 'error' && temboError && (
+          <div className="text-sm text-red-600">
+            Error: {temboError}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={onCopy}
+            className="flex items-center gap-2"
+            disabled={isGenerating || !prompt}
+          >
+            {copied ? (
+              <>
+                <Check size={16} />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                Copy Prompt
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleSendToTembo}
+            className="flex items-center gap-2"
+            disabled={isGenerating || !prompt || temboStatus === 'sending'}
+          >
+            {temboStatus === 'sending' ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Sending...
+              </>
+            ) : temboStatus === 'sent' ? (
+              <>
+                <Check size={16} />
+                Sent!
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                Send to Tembo
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </motion.div>
   );
 }
-

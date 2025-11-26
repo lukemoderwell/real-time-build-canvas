@@ -109,6 +109,7 @@ export default function Page() {
   const [currentSessionText, setCurrentSessionText] = useState('');
   const [fullTranscript, setFullTranscript] = useState('');
   const [buildPrompt, setBuildPrompt] = useState<string | null>(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const [codingAgentPanelPosition, setCodingAgentPanelPosition] = useState({
@@ -898,6 +899,11 @@ export default function Page() {
       )
     );
 
+    // Open panel immediately with loading state
+    setBuildPrompt(null);
+    setIsGeneratingPrompt(true);
+    setIsPromptDialogOpen(true);
+
     // Generate build prompt
     try {
       const prompt = await generateBuildPrompt(
@@ -908,9 +914,10 @@ export default function Page() {
         }))
       );
       setBuildPrompt(prompt);
-      setIsPromptDialogOpen(true);
     } catch (error) {
       console.error('Error generating build prompt:', error);
+    } finally {
+      setIsGeneratingPrompt(false);
     }
 
     setTimeout(() => {
@@ -1035,7 +1042,7 @@ export default function Page() {
             isPromptDialogOpen ? (
               <CodingAgentPanel
                 prompt={buildPrompt}
-                isGenerating={!buildPrompt}
+                isGenerating={isGeneratingPrompt}
                 onClose={() => setIsPromptDialogOpen(false)}
                 onCopy={handleCopyPrompt}
                 copied={promptCopied}
@@ -1076,6 +1083,7 @@ export default function Page() {
         onSendToAgent={handleSendFeatureToAgent}
         onDelete={handleDeleteFeature}
         onCreateRelatedFeature={handleCreateRelatedFeature}
+        isBuildingPrompt={isGeneratingPrompt}
       />
 
       {/* Delete Feature Confirmation Modal */}

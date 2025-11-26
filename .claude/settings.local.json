@@ -4,7 +4,10 @@
       "Bash(npx tsc:*)",
       "Bash(npm run lint:*)",
       "Bash(pnpm run lint:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:docs.tembo.io)",
+      "WebSearch",
+      "Bash(pnpm run build:*)"
     ],
     "deny": [],
     "ask": []
