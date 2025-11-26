@@ -916,6 +916,7 @@ export default function Page() {
       setBuildPrompt(prompt);
     } catch (error) {
       console.error('Error generating build prompt:', error);
+      setBuildPrompt('Error generating prompt. Please try again.');
     } finally {
       setIsGeneratingPrompt(false);
     }

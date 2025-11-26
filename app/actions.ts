@@ -89,30 +89,8 @@ Output ONLY the prompt text, no markdown formatting, no explanations.`,
 
     return text.trim();
   } catch (error) {
-    console.log('Error generating build prompt (using fallback):', error);
-    // Fallback: create a simple structured prompt
-    const nodesText = nodes
-      .map(
-        (node, idx) => `
-${idx + 1}. [${node.type.toUpperCase()}] ${node.title}
-   ${node.content}`
-      )
-      .join('\n');
-
-    return `BUILD AN MVP - Focus on speed, not perfection.
-
-Requirements:
-${nodesText}
-
-MVP RULES:
-- Build the simplest version that proves the concept works
-- One happy path only - skip edge cases
-- Mock external APIs and integrations
-- Skip auth unless absolutely critical
-- Functional > pretty - no polish needed
-- Note what you're skipping for later
-
-Ship something working in hours, not days.`;
+    console.error('Error generating build prompt:', error);
+    throw error;
   }
 }
 
