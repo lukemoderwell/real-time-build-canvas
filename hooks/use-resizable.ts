@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
 interface UseResizableOptions {
   initialWidth: number;
@@ -16,6 +16,28 @@ interface UseResizableReturn {
   handleMouseDown: (e: React.MouseEvent) => void;
 }
 
+// Helper to read from localStorage with validation
+function getStoredWidth(
+  storageKey: string | undefined,
+  minWidth: number,
+  maxWidth: number,
+  fallback: number
+): number {
+  if (!storageKey) return fallback;
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
+        return parsed;
+      }
+    }
+  } catch {
+    // localStorage not available
+  }
+  return fallback;
+}
+
 export function useResizable({
   initialWidth,
   minWidth = 200,
@@ -23,28 +45,21 @@ export function useResizable({
   direction,
   storageKey,
 }: UseResizableOptions): UseResizableReturn {
-  // Always initialize with initialWidth to match server render and avoid hydration mismatch
-  const [width, setWidth] = useState(initialWidth);
+  // Use useSyncExternalStore to safely read from localStorage
+  // This prevents hydration mismatches by returning initialWidth on server
+  const storedWidth = useSyncExternalStore(
+    // Subscribe - localStorage doesn't have events, so we just return a no-op
+    () => () => {},
+    // getSnapshot (client) - read from localStorage
+    () => getStoredWidth(storageKey, minWidth, maxWidth, initialWidth),
+    // getServerSnapshot - always return initialWidth on server
+    () => initialWidth
+  );
+
+  const [width, setWidth] = useState(storedWidth);
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
-  const hasHydrated = useRef(false);
-
-  // Load from localStorage after hydration to avoid SSR mismatch
-  useEffect(() => {
-    if (hasHydrated.current) return;
-    hasHydrated.current = true;
-
-    if (storageKey) {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
-          setWidth(parsed);
-        }
-      }
-    }
-  }, [storageKey, minWidth, maxWidth]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
