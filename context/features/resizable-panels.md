@@ -9,11 +9,11 @@ All side panels (Transcript, Agent Sidebar, Feature Details) are resizable via d
 
 ## Panel Configuration
 
-| Panel | Direction | Min | Max | Storage Key |
-|-------|-----------|-----|-----|-------------|
-| TranscriptPanel | right | 200px | 500px | `transcript-panel-width` |
-| AgentSidebar | left | 200px | 500px | `agent-sidebar-width` |
-| FeatureDetailsPanel | left | 300px | 600px | `feature-panel-width` |
+| Panel               | Direction | Min   | Max   | Storage Key              |
+| ------------------- | --------- | ----- | ----- | ------------------------ |
+| TranscriptPanel     | right     | 200px | 500px | `transcript-panel-width` |
+| AgentSidebar        | left      | 200px | 500px | `agent-sidebar-width`    |
+| FeatureDetailsPanel | left      | 300px | 600px | `feature-panel-width`    |
 
 ## Width Persistence
 

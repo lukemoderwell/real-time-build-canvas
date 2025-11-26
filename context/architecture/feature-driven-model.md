@@ -17,9 +17,11 @@ Feature Group (e.g., "Real-time Collaboration")
 ```
 
 ### Groups = Features
+
 Groups are the primary organizational unit. Each group represents a complete product feature.
 
 **What's stored:**
+
 - `name` - Feature title (e.g., "Real-time Collaboration")
 - `summary` - 2-3 sentence plain English description
 - `userValue` - Why users want this feature
@@ -30,20 +32,24 @@ Groups are the primary organizational unit. Each group represents a complete pro
 - `conversationHistory` - All discussions about this feature with timestamps and insights
 
 **Visual:**
+
 - Rendered as dashed border containers on the canvas
 - Colored accent for visual distinction
 - Clickable to open feature details panel
 
 ### Nodes = Capabilities
+
 Nodes are simple, specific requirements that belong to a feature.
 
 **What's stored:**
+
 - `title` - Short name (e.g., "Multiple colored cursors")
 - `description` - Brief 1-2 sentence explanation
 - `groupId` - Parent feature (required)
 - `type` - Always "capability"
 
 **Visual:**
+
 - Small cards inside feature groups
 - Show title + brief description
 - Colored top border matching parent group
@@ -51,23 +57,31 @@ Nodes are simple, specific requirements that belong to a feature.
 ## How It Works
 
 ### 1. Speech Input
+
 User speaks naturally about what they want to build:
+
 > "I want real-time collaboration with multiple cursors"
 
 ### 2. Analysis
+
 AI determines if this is a:
+
 - **FEATURE** - High-level product feature (creates/updates group)
 - **CAPABILITY** - Specific requirement (creates node in matching group)
 - **NOISE** - Not actionable (skips)
 
 ### 3. Feature Detection
+
 If it's a feature:
+
 - Semantic matching checks if it relates to existing features
 - Either updates existing feature or creates new group
 - Extracts: summary, user value, capabilities, technical notes, open questions
 
 ### 4. Capability Detection
+
 If it's a capability:
+
 - AI matches it to the most relevant feature group
 - Creates a node with that `groupId`
 - Adds to parent feature's conversation history
@@ -75,11 +89,13 @@ If it's a capability:
 ## Processing Modes
 
 **Interval-based (default):**
+
 - Accumulates transcript for 30 seconds
 - Processes batch when interval fires
 - Better context, less immediate
 
 **Manual trigger:**
+
 - Click "Analyze" button in transcript panel
 - Processes accumulated transcript on demand
 - Gives user control over when features are created
@@ -87,16 +103,19 @@ If it's a capability:
 ## Design Rationale
 
 **Why hierarchical?**
+
 - Mirrors how people think about products (features → details)
 - Prevents flat list chaos as projects grow
 - Natural grouping for handoff to builders
 
 **Why "back of card" details?**
+
 - Front shows simple title (visual glanceability)
 - Back stores rich context (comprehensive for builders)
 - Gradual disclosure - complexity hidden until needed
 
 **Why AI-driven grouping?**
+
 - Humans speak naturally, not in structured formats
 - Semantic matching better than keyword-based
 - Adapts as conversation evolves

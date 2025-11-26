@@ -107,60 +107,68 @@ export function CodingAgentPanel({
     >
       {/* Header - draggable area */}
       <div
-        className="flex items-center justify-between p-4 border-b border-border bg-background/50"
+        className='flex items-center justify-between p-4 border-b border-border bg-background/50'
         onMouseDown={(e) => {
-          if (e.target === e.currentTarget || (e.target as HTMLElement).closest('button') === null) {
+          if (
+            e.target === e.currentTarget ||
+            (e.target as HTMLElement).closest('button') === null
+          ) {
             handleMouseDown(e);
           }
         }}
       >
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600/10 rounded-lg">
-            <Terminal className="h-5 w-5 text-blue-600" />
+        <div className='flex items-center gap-3'>
+          <div className='p-2 bg-blue-600/10 rounded-lg'>
+            <Terminal className='h-5 w-5 text-blue-600' />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Coding Agent</h2>
-            <p className="text-xs text-muted-foreground">Build prompt ready</p>
+            <h2 className='text-lg font-semibold'>Coding Agent</h2>
+            <p className='text-xs text-muted-foreground'>Build prompt ready</p>
           </div>
         </div>
         <Button
-          variant="ghost"
-          size="sm"
+          variant='ghost'
+          size='sm'
           onClick={onClose}
-          className="flex-shrink-0"
+          className='flex-shrink-0'
         >
-          <X className="h-4 w-4" />
+          <X className='h-4 w-4' />
         </Button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 bg-secondary/30 min-h-[300px] max-h-[500px]">
+      <div className='flex-1 overflow-y-auto p-4 bg-secondary/30 min-h-[300px] max-h-[500px]'>
         {isGenerating ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-sm text-muted-foreground">Generating prompt...</p>
+          <div className='flex items-center justify-center h-full'>
+            <div className='text-center'>
+              <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4'></div>
+              <p className='text-sm text-muted-foreground'>
+                Generating prompt...
+              </p>
             </div>
           </div>
         ) : (
-          <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-foreground">
+          <pre className='whitespace-pre-wrap text-sm font-mono leading-relaxed text-foreground'>
             {prompt}
           </pre>
         )}
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border bg-background/50 space-y-3">
+      <div className='p-4 border-t border-border bg-background/50 space-y-3'>
         {/* Agent selector */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="agent-select" className="text-sm text-muted-foreground">
+        <div className='flex items-center gap-2'>
+          <label
+            htmlFor='agent-select'
+            className='text-sm text-muted-foreground'
+          >
             Agent:
           </label>
           <select
-            id="agent-select"
+            id='agent-select'
             value={selectedAgent}
             onChange={(e) => setSelectedAgent(e.target.value)}
-            className="flex-1 h-9 px-3 rounded-md border border-input bg-background text-sm"
+            className='flex-1 h-9 px-3 rounded-md border border-input bg-background text-sm'
             disabled={isGenerating || !prompt || temboStatus === 'sending'}
           >
             {TEMBO_AGENTS.map((agent) => (
@@ -173,23 +181,21 @@ export function CodingAgentPanel({
 
         {/* Status message */}
         {temboStatus === 'sent' && (
-          <div className="text-sm text-green-600 flex items-center gap-2">
+          <div className='text-sm text-green-600 flex items-center gap-2'>
             <Check size={16} />
             Sent to Tembo!
           </div>
         )}
         {temboStatus === 'error' && temboError && (
-          <div className="text-sm text-red-600">
-            Error: {temboError}
-          </div>
+          <div className='text-sm text-red-600'>Error: {temboError}</div>
         )}
 
         {/* Action buttons */}
-        <div className="flex items-center justify-end gap-2">
+        <div className='flex items-center justify-end gap-2'>
           <Button
-            variant="outline"
+            variant='outline'
             onClick={onCopy}
-            className="flex items-center gap-2"
+            className='flex items-center gap-2'
             disabled={isGenerating || !prompt}
           >
             {copied ? (
@@ -206,12 +212,12 @@ export function CodingAgentPanel({
           </Button>
           <Button
             onClick={handleSendToTembo}
-            className="flex items-center gap-2"
+            className='flex items-center gap-2'
             disabled={isGenerating || !prompt || temboStatus === 'sending'}
           >
             {temboStatus === 'sending' ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={16} className='animate-spin' />
                 Sending...
               </>
             ) : temboStatus === 'sent' ? (

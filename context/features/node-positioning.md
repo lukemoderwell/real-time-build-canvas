@@ -19,6 +19,7 @@ In `lib/utils.ts`:
 ## Usage
 
 Called in three places in `page.tsx`:
+
 1. New capabilities added to existing feature group
 2. New feature group creation (initial capabilities)
 3. Single capability added via transcript analysis

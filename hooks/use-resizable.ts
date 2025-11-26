@@ -26,22 +26,29 @@ export function useResizable({
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    startXRef.current = e.clientX;
-    startWidthRef.current = width;
-  }, [width]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      startXRef.current = e.clientX;
+      startWidthRef.current = width;
+    },
+    [width]
+  );
 
   useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const delta = direction === 'right'
-        ? e.clientX - startXRef.current
-        : startXRef.current - e.clientX;
+      const delta =
+        direction === 'right'
+          ? e.clientX - startXRef.current
+          : startXRef.current - e.clientX;
 
-      const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidthRef.current + delta));
+      const newWidth = Math.min(
+        maxWidth,
+        Math.max(minWidth, startWidthRef.current + delta)
+      );
       setWidth(newWidth);
     };
 

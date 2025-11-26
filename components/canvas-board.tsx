@@ -148,7 +148,9 @@ export function CanvasBoard({
     <div
       ref={containerRef}
       style={{
-        marginLeft: isTranscriptPanelOpen ? `${transcriptPanelWidth}px` : '48px',
+        marginLeft: isTranscriptPanelOpen
+          ? `${transcriptPanelWidth}px`
+          : '48px',
       }}
       className={cn(
         'h-full overflow-hidden bg-background relative cursor-crosshair transition-all duration-200',
@@ -173,7 +175,9 @@ export function CanvasBoard({
       <div
         className={cn(
           'absolute inset-0 origin-top-left',
-          isDragging ? 'transition-none' : 'transition-transform duration-75 ease-out'
+          isDragging
+            ? 'transition-none'
+            : 'transition-transform duration-75 ease-out'
         )}
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -209,7 +213,9 @@ export function CanvasBoard({
               key={group.id}
               className={cn(
                 'absolute rounded-3xl border transition-all duration-200 group backdrop-blur-[2px]',
-                isBeingDragged ? 'transition-none shadow-xl scale-[1.005]' : 'hover:shadow-md'
+                isBeingDragged
+                  ? 'transition-none shadow-xl scale-[1.005]'
+                  : 'hover:shadow-md'
               )}
               style={{
                 left: minX - 30,
@@ -351,8 +357,8 @@ export function CanvasBoard({
             isRecording && recordingMode === 'ptt'
               ? 'bg-orange-500 text-white'
               : isRecording && recordingMode === 'toggle'
-              ? 'bg-red-500 text-white hover:bg-red-600'
-              : 'bg-white text-black hover:bg-gray-100 border border-border'
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-white text-black hover:bg-gray-100 border border-border'
           )}
           title={
             isRecording

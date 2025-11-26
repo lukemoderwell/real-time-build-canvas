@@ -102,10 +102,14 @@ export async function generateAgentThoughts(
 ): Promise<{ message: string | null; thought: string | null }> {
   try {
     const roleDomains: Record<string, string> = {
-      designer: 'UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns',
-      backend: 'APIs, databases, authentication, security, performance, scalability',
-      cloud: 'Infrastructure, deployment, CI/CD, cloud services (AWS, Vercel), DevOps',
-      visionary: 'Product vision, simplicity, quality, innovation, the "why" behind features',
+      designer:
+        'UI/UX design, user flows, visual hierarchy, accessibility, interaction patterns',
+      backend:
+        'APIs, databases, authentication, security, performance, scalability',
+      cloud:
+        'Infrastructure, deployment, CI/CD, cloud services (AWS, Vercel), DevOps',
+      visionary:
+        'Product vision, simplicity, quality, innovation, the "why" behind features',
     };
 
     const domain = roleDomains[agentRole];
@@ -158,7 +162,10 @@ Example: {"message": "What's the data model?", "thought": "This needs careful AP
     try {
       object = JSON.parse(cleanText);
     } catch {
-      console.error(`[v0] JSON parse error for ${agentName}. Raw text:`, cleanText);
+      console.error(
+        `[v0] JSON parse error for ${agentName}. Raw text:`,
+        cleanText
+      );
       return { message: null, thought: null };
     }
 

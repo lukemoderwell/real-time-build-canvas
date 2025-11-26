@@ -1,4 +1,15 @@
-import { LayoutTemplate, Database, Cloud, Box, Code2, Cpu, Palette, Server, ShieldCheck, Zap } from "lucide-react"
+import {
+  LayoutTemplate,
+  Database,
+  Cloud,
+  Box,
+  Code2,
+  Cpu,
+  Palette,
+  Server,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
 
 export const Icons = {
   designer: Palette,
@@ -11,4 +22,4 @@ export const Icons = {
   security: ShieldCheck,
   fast: Zap,
   layout: LayoutTemplate,
-}
+};

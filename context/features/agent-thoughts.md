@@ -5,10 +5,12 @@ Four expert agents (Sarah/Designer, Mike/Backend, Alex/Cloud, Steve/Visionary) l
 ## How Thoughts Are Generated
 
 `generateAgentThoughts()` in `app/actions.ts` sends transcript to the AI with:
+
 - Agent's role and domain expertise
 - Last 5 previous diary entries (to avoid repetition)
 
 The AI returns:
+
 - `message` - Optional public question (max 12 words)
 - `thought` - Optional private diary entry (max 35 words)
 

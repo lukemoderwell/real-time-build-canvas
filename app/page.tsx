@@ -19,7 +19,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { Agent, NodeData, NodeGroup } from '@/lib/types';
-import { generateId, mergeFeatureDetails, findNonOverlappingPosition, positionNewNodes, generateRandomColor } from '@/lib/utils';
+import {
+  generateId,
+  mergeFeatureDetails,
+  findNonOverlappingPosition,
+  positionNewNodes,
+  generateRandomColor,
+} from '@/lib/utils';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useSpacebarRecording } from '@/hooks/use-spacebar-recording';
 import {
@@ -263,7 +269,9 @@ export default function Page() {
         agents.map(async (agent) => {
           if (!agent.isEnabled) return;
 
-          const previousThoughts = agent.diaryEntries.map((entry) => entry.content);
+          const previousThoughts = agent.diaryEntries.map(
+            (entry) => entry.content
+          );
           const response = await generateAgentThoughts(
             text,
             agent.role,
@@ -336,7 +344,9 @@ export default function Page() {
 
         if (match.matchedGroupId && match.confidence >= 0.7) {
           // Update existing feature group and create nodes for new capabilities
-          const existingGroup = groups.find((g) => g.id === match.matchedGroupId);
+          const existingGroup = groups.find(
+            (g) => g.id === match.matchedGroupId
+          );
           const existingCapabilities = existingGroup?.keyCapabilities || [];
           const existingNodeTitles = nodes
             .filter((n) => n.groupId === match.matchedGroupId)
@@ -380,11 +390,19 @@ export default function Page() {
           }
 
           // Update group using helper
-          const conversation = { transcript: accumulatedText, reasoning: analysis.reasoning };
+          const conversation = {
+            transcript: accumulatedText,
+            reasoning: analysis.reasoning,
+          };
           setGroups((prev) =>
             prev.map((g) =>
               g.id === match.matchedGroupId
-                ? mergeFeatureDetails(g, featureDetails, conversation, newCapabilityNodes.map((n) => n.id))
+                ? mergeFeatureDetails(
+                    g,
+                    featureDetails,
+                    conversation,
+                    newCapabilityNodes.map((n) => n.id)
+                  )
                 : g
             )
           );
@@ -405,8 +423,8 @@ export default function Page() {
             160
           );
 
-          const capabilityNodes: NodeData[] = featureDetails.keyCapabilities.map(
-            (capability, index) => ({
+          const capabilityNodes: NodeData[] =
+            featureDetails.keyCapabilities.map((capability, index) => ({
               id: generateId(),
               title: capability,
               description: '',
@@ -416,8 +434,7 @@ export default function Page() {
               y: positions[index]?.y ?? baseCentroid.y,
               width: 288,
               height: 160,
-            })
-          );
+            }));
 
           const newGroup: NodeGroup = {
             id: newGroupId,
@@ -460,9 +477,8 @@ export default function Page() {
 
         if (match.matchedGroupId && match.confidence >= 0.7) {
           // Extract capability details
-          const capabilityDetails = await extractCapabilityDetails(
-            accumulatedText
-          );
+          const capabilityDetails =
+            await extractCapabilityDetails(accumulatedText);
 
           // Find the group's centroid for positioning
           const targetGroup = groups.find((g) => g.id === match.matchedGroupId);
@@ -602,7 +618,12 @@ export default function Page() {
     if (transcriptBuffer.length > 0) {
       await processAccumulatedTranscript();
     }
-  }, [transcriptBuffer, processAccumulatedTranscript, currentSessionText, stopListening]);
+  }, [
+    transcriptBuffer,
+    processAccumulatedTranscript,
+    currentSessionText,
+    stopListening,
+  ]);
 
   // Helper to stop PTT recording with immediate analysis
   const handleStopPTT = useCallback(async () => {
@@ -633,11 +654,12 @@ export default function Page() {
     if (selectedNodes.length === 0) return;
 
     setNodes((prev) => prev.filter((node) => !selectedNodes.includes(node.id)));
-    setGroups((prev) =>
-      prev.map((group) => ({
-        ...group,
-        nodeIds: group.nodeIds.filter((id) => !selectedNodes.includes(id)),
-      }))
+    setGroups(
+      (prev) =>
+        prev.map((group) => ({
+          ...group,
+          nodeIds: group.nodeIds.filter((id) => !selectedNodes.includes(id)),
+        }))
       // Note: We no longer filter out empty groups here - features persist even when empty
     );
     setSelectedNodes([]);
@@ -704,7 +726,8 @@ export default function Page() {
 
     // Check if buffer has meaningful content (at least 2 items or total length > 50 chars)
     const totalLength = transcriptBuffer.join(' ').length;
-    const hasMeaningfulContent = transcriptBuffer.length >= 2 || totalLength > 50;
+    const hasMeaningfulContent =
+      transcriptBuffer.length >= 2 || totalLength > 50;
 
     if (hasMeaningfulContent) {
       // Clear any existing timeout
@@ -727,7 +750,13 @@ export default function Page() {
         autoAnalysisTimeoutRef.current = null;
       }
     };
-  }, [transcriptBuffer, isListening, isAnalyzing, autoAnalysisDelayMs, processAccumulatedTranscript]);
+  }, [
+    transcriptBuffer,
+    isListening,
+    isAnalyzing,
+    autoAnalysisDelayMs,
+    processAccumulatedTranscript,
+  ]);
 
   // Interval-based transcript processing (fallback - ensures nothing gets stuck)
   useEffect(() => {
@@ -741,7 +770,13 @@ export default function Page() {
     }, processingIntervalMs);
 
     return () => clearInterval(intervalId);
-  }, [isListening, processingIntervalMs, processAccumulatedTranscript, transcriptBuffer.length, isAnalyzing]);
+  }, [
+    isListening,
+    processingIntervalMs,
+    processAccumulatedTranscript,
+    transcriptBuffer.length,
+    isAnalyzing,
+  ]);
 
   // Staggered agent thinking intervals - consolidated and optimized
   useEffect(() => {
@@ -773,7 +808,9 @@ export default function Page() {
 
           lastProcessedLength.set(agent.name, currentLength);
 
-          const previousThoughts = agent.diaryEntries.map((entry) => entry.content);
+          const previousThoughts = agent.diaryEntries.map(
+            (entry) => entry.content
+          );
           const response = await generateAgentThoughts(
             fullTranscript,
             agent.role,
@@ -943,51 +980,55 @@ export default function Page() {
   };
 
   // Create a new feature from a related feature name
-  const handleCreateRelatedFeature = useCallback((featureName: string) => {
-    // Check if a feature with this name already exists
-    const existingFeature = groups.find(
-      (g) => g.name.toLowerCase() === featureName.toLowerCase()
-    );
+  const handleCreateRelatedFeature = useCallback(
+    (featureName: string) => {
+      // Check if a feature with this name already exists
+      const existingFeature = groups.find(
+        (g) => g.name.toLowerCase() === featureName.toLowerCase()
+      );
 
-    if (existingFeature) {
-      // If it exists, just open its details panel
-      setSelectedFeatureId(existingFeature.id);
-      return;
-    }
+      if (existingFeature) {
+        // If it exists, just open its details panel
+        setSelectedFeatureId(existingFeature.id);
+        return;
+      }
 
-    // Create a new feature group
-    const newGroupId = generateId();
-    const baseCentroid = {
-      x: 200 + Math.random() * 600,
-      y: 200 + Math.random() * 400,
-    };
+      // Create a new feature group
+      const newGroupId = generateId();
+      const baseCentroid = {
+        x: 200 + Math.random() * 600,
+        y: 200 + Math.random() * 400,
+      };
 
-    const newGroup: NodeGroup = {
-      id: newGroupId,
-      name: featureName,
-      color: generateRandomColor(),
-      nodeIds: [],
-      centroid: baseCentroid,
-      summary: '',
-      userValue: '',
-      keyCapabilities: [],
-      technicalApproach: undefined,
-      openQuestions: [],
-      relatedFeatures: [],
-      conversationHistory: [
-        {
-          timestamp: new Date(),
-          transcript: `Created from related feature link`,
-          insights: 'Feature created for exploration - describe it to add details',
-        },
-      ],
-    };
+      const newGroup: NodeGroup = {
+        id: newGroupId,
+        name: featureName,
+        color: generateRandomColor(),
+        nodeIds: [],
+        centroid: baseCentroid,
+        summary: '',
+        userValue: '',
+        keyCapabilities: [],
+        technicalApproach: undefined,
+        openQuestions: [],
+        relatedFeatures: [],
+        conversationHistory: [
+          {
+            timestamp: new Date(),
+            transcript: `Created from related feature link`,
+            insights:
+              'Feature created for exploration - describe it to add details',
+          },
+        ],
+      };
 
-    setGroups((prev) => [...prev, newGroup]);
+      setGroups((prev) => [...prev, newGroup]);
 
-    // Open the new feature's details panel
-    setSelectedFeatureId(newGroupId);
-  }, [groups]);
+      // Open the new feature's details panel
+      setSelectedFeatureId(newGroupId);
+    },
+    [groups]
+  );
 
   const handleToggleAgent = (agentId: string) => {
     setAgents((prev) =>

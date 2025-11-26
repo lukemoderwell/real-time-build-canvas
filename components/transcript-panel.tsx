@@ -30,7 +30,11 @@ export function TranscriptPanel({
   onWidthChange,
 }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { width: resizeWidth, isResizing, handleMouseDown } = useResizable({
+  const {
+    width: resizeWidth,
+    isResizing,
+    handleMouseDown,
+  } = useResizable({
     initialWidth: width,
     minWidth: 200,
     maxWidth: 500,
@@ -100,7 +104,11 @@ export function TranscriptPanel({
       style={{ width: `${resizeWidth}px` }}
       className='h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute left-0 top-0 shadow-2xl'
     >
-      <ResizeHandle direction="right" onMouseDown={handleMouseDown} isResizing={isResizing} />
+      <ResizeHandle
+        direction='right'
+        onMouseDown={handleMouseDown}
+        isResizing={isResizing}
+      />
       <div className='p-4 border-b border-border flex items-center justify-between'>
         <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
           Transcript

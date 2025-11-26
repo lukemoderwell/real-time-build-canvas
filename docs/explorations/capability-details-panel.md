@@ -18,11 +18,11 @@ Enable building individual capabilities (MVP approach) instead of entire feature
 
 ## Current State Analysis
 
-| Component | Current Behavior |
-|-----------|-----------------|
-| NodeCard click | Toggles selection in `selectedNodes` array |
-| FeatureDetailsPanel | Opens when clicking feature group label |
-| Build flow | `generateBuildPrompt` takes array of `{title, content, type}` |
+| Component           | Current Behavior                                              |
+| ------------------- | ------------------------------------------------------------- |
+| NodeCard click      | Toggles selection in `selectedNodes` array                    |
+| FeatureDetailsPanel | Opens when clicking feature group label                       |
+| Build flow          | `generateBuildPrompt` takes array of `{title, content, type}` |
 
 ## Implementation Plan
 
@@ -41,6 +41,7 @@ interface CapabilityDetailsPanelProps {
 ```
 
 **Panel Contents:**
+
 - Header with capability title and close button
 - Description section
 - Parent feature link (clickable badge that opens FeatureDetailsPanel)
@@ -51,7 +52,9 @@ interface CapabilityDetailsPanelProps {
 ### 2. Add State in page.tsx
 
 ```typescript
-const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(null);
+const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(
+  null
+);
 ```
 
 ### 3. Update NodeCard Click Behavior
@@ -81,15 +84,19 @@ const handleNodeSelect = (id: string, event?: React.MouseEvent) => {
 const handleBuildCapability = async (capability: NodeData) => {
   // Update status
   setNodes((prev) =>
-    prev.map((n) => n.id === capability.id ? { ...n, status: 'processing' } : n)
+    prev.map((n) =>
+      n.id === capability.id ? { ...n, status: 'processing' } : n
+    )
   );
 
   // Generate prompt for single capability
-  const prompt = await generateBuildPrompt([{
-    title: capability.title,
-    content: capability.description,
-    type: capability.type,
-  }]);
+  const prompt = await generateBuildPrompt([
+    {
+      title: capability.title,
+      content: capability.description,
+      type: capability.type,
+    },
+  ]);
 
   setBuildPrompt(prompt);
   setIsPromptDialogOpen(true);
@@ -97,7 +104,7 @@ const handleBuildCapability = async (capability: NodeData) => {
   // Mark as coded after delay
   setTimeout(() => {
     setNodes((prev) =>
-      prev.map((n) => n.id === capability.id ? { ...n, status: 'coded' } : n)
+      prev.map((n) => (n.id === capability.id ? { ...n, status: 'coded' } : n))
     );
   }, 3000);
 };
@@ -110,9 +117,11 @@ In page.tsx JSX, after FeatureDetailsPanel:
 ```tsx
 <CapabilityDetailsPanel
   capability={nodes.find((n) => n.id === selectedCapabilityId) || null}
-  parentFeature={groups.find((g) =>
-    selectedCapabilityId && g.nodeIds.includes(selectedCapabilityId)
-  ) || null}
+  parentFeature={
+    groups.find(
+      (g) => selectedCapabilityId && g.nodeIds.includes(selectedCapabilityId)
+    ) || null
+  }
   onClose={() => setSelectedCapabilityId(null)}
   onBuild={handleBuildCapability}
   onViewFeature={(featureId) => {
@@ -124,12 +133,12 @@ In page.tsx JSX, after FeatureDetailsPanel:
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `components/capability-details-panel.tsx` | **NEW** - Create the panel component |
-| `app/page.tsx` | Add state, update handleNodeSelect, add handleBuildCapability, render panel |
-| `components/node-card.tsx` | Pass event object through onSelect callback |
-| `components/canvas-board.tsx` | Update onNodeSelect prop type to include event |
+| File                                      | Changes                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `components/capability-details-panel.tsx` | **NEW** - Create the panel component                                        |
+| `app/page.tsx`                            | Add state, update handleNodeSelect, add handleBuildCapability, render panel |
+| `components/node-card.tsx`                | Pass event object through onSelect callback                                 |
+| `components/canvas-board.tsx`             | Update onNodeSelect prop type to include event                              |
 
 ## Panel Closing Behavior
 

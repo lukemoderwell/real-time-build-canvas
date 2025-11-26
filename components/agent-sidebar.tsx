@@ -5,7 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import { Book, Clock, ChevronDown, Settings, X, Check, ChevronRight, ChevronLeft } from 'lucide-react';
+import {
+  Book,
+  Clock,
+  ChevronDown,
+  Settings,
+  X,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+} from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -69,7 +78,11 @@ export function AgentSidebar({
       style={{ width: `${width}px` }}
       className='h-full border-l border-border bg-card/50 backdrop-blur-xl flex flex-col z-20 absolute right-0 top-0 shadow-2xl'
     >
-      <ResizeHandle direction="left" onMouseDown={handleMouseDown} isResizing={isResizing} />
+      <ResizeHandle
+        direction='left'
+        onMouseDown={handleMouseDown}
+        isResizing={isResizing}
+      />
       <div className='p-4 border-b border-border flex items-center justify-between'>
         <h2 className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
           Expert Agents
@@ -279,7 +292,8 @@ function AgentItem({
             className='overflow-hidden'
           >
             <div className='pt-1 pb-3 px-3 space-y-3 border-x border-b border-border/50 rounded-b-lg mx-1 bg-background/30'>
-              {agent.diaryEntries.length === 0 && agent.crossedOffEntries.length === 0 ? (
+              {agent.diaryEntries.length === 0 &&
+              agent.crossedOffEntries.length === 0 ? (
                 <div className='text-center py-4 text-muted-foreground text-xs'>
                   <Book className='w-4 h-4 mx-auto mb-2 opacity-20' />
                   <p>No thoughts yet.</p>
@@ -321,7 +335,9 @@ function AgentItem({
                                 <div className='flex items-center gap-1 text-[9px] text-muted-foreground opacity-0 group-hover/entry:opacity-100 transition-opacity'>
                                   <Clock size={8} />
                                   <span>
-                                    {new Date(entry.timestamp).toLocaleTimeString()}
+                                    {new Date(
+                                      entry.timestamp
+                                    ).toLocaleTimeString()}
                                   </span>
                                 </div>
                                 <div className='flex items-center gap-1 opacity-0 group-hover/entry:opacity-100 transition-opacity'>
@@ -389,7 +405,9 @@ function AgentItem({
                               <div className='flex items-center gap-1 mt-1 ml-1 text-[9px] text-muted-foreground'>
                                 <Clock size={8} />
                                 <span>
-                                  {new Date(entry.timestamp).toLocaleTimeString()}
+                                  {new Date(
+                                    entry.timestamp
+                                  ).toLocaleTimeString()}
                                 </span>
                               </div>
                             </div>

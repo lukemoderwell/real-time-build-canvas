@@ -127,7 +127,14 @@ export function useSpacebarRecording({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [recordingMode, isListening, startListening, stopListening, onStopRecording, onStopPTT]);
+  }, [
+    recordingMode,
+    isListening,
+    startListening,
+    stopListening,
+    onStopRecording,
+    onStopPTT,
+  ]);
 
   // Window blur -> stop PTT
   useEffect(() => {

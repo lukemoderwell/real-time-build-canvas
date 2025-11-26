@@ -1,6 +1,6 @@
-# Linting Process
+# Linting & Formatting
 
-Run `pnpm run lint` after any changes to JavaScript or TypeScript files. Fix all errors before committing.
+Run `pnpm run lint` and `pnpm run format` after any changes to JavaScript or TypeScript files. Fix all errors before committing.
 
 ## When to Run
 
@@ -24,6 +24,14 @@ Run `pnpm run lint` after any changes to JavaScript or TypeScript files. Fix all
 ## Config
 
 ESLint is configured in `eslint.config.mjs` using the flat config format (ESLint 9). Includes:
+
 - TypeScript support via `typescript-eslint`
 - React and React Hooks rules
 - Next.js specific rules
+
+Prettier is configured in `.prettierrc`:
+
+- Single quotes
+- Semicolons
+- 2-space indentation
+- ES5 trailing commas
