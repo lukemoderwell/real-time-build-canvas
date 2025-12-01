@@ -134,6 +134,11 @@ export default function Page() {
   const isAnalyzingRef = useRef(false); // Ref to prevent race conditions
   const autoAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Refs for staggered agent thinking (to avoid resetting intervals on state changes)
+  const agentsRef = useRef<Agent[]>(agents);
+  const lastProcessedLengthRef = useRef<Map<string, number>>(new Map());
+  const fullTranscriptRef = useRef<string>('');
+
   // Feature details panel state
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
     null
@@ -173,6 +178,15 @@ export default function Page() {
       })
     );
   }, []);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    agentsRef.current = agents;
+  }, [agents]);
+
+  useEffect(() => {
+    fullTranscriptRef.current = fullTranscript;
+  }, [fullTranscript]);
 
   const handleMarkAsRead = (agentId: string) => {
     setAgents((prev) =>
@@ -809,11 +823,12 @@ export default function Page() {
   ]);
 
   // Staggered agent thinking intervals - consolidated and optimized
-  useEffect(() => {
-    if (!fullTranscript.trim()) return;
+  // Uses refs to avoid resetting intervals when agent state changes (e.g., when thoughts are added)
+  const hasTranscript = fullTranscript.trim().length > 0;
 
-    // Track last processed transcript length per agent
-    const lastProcessedLength = new Map<string, number>();
+  useEffect(() => {
+    if (!hasTranscript) return;
+
     const agentIntervalMap = new Map([
       ['Sarah', 30000], // 30 seconds
       ['Steve', 40000], // 40 seconds
@@ -821,28 +836,33 @@ export default function Page() {
       ['Alex', 60000], // 60 seconds
     ]);
 
-    const intervalIds = agents
-      .filter((agent) => agent.isEnabled && agentIntervalMap.has(agent.name))
-      .map((agent) => {
-        const interval = agentIntervalMap.get(agent.name)!;
-        lastProcessedLength.set(agent.name, 0);
-
+    // Set up intervals for each agent name (static list)
+    const intervalIds = Array.from(agentIntervalMap.entries()).map(
+      ([agentName, interval]) => {
         const intervalId = setInterval(async () => {
-          const currentLength = fullTranscript.trim().length;
-          const lastLength = lastProcessedLength.get(agent.name) || 0;
+          // Get fresh data from refs (avoids stale closure issues)
+          const currentAgents = agentsRef.current;
+          const currentTranscript = fullTranscriptRef.current;
+          const agent = currentAgents.find((a) => a.name === agentName);
+
+          if (!agent || !agent.isEnabled) return;
+
+          const currentLength = currentTranscript.trim().length;
+          const lastLength =
+            lastProcessedLengthRef.current.get(agentName) || 0;
 
           // Only process if transcript has meaningfully changed (at least 50 new characters)
           if (currentLength === 0 || currentLength - lastLength < 50) {
             return;
           }
 
-          lastProcessedLength.set(agent.name, currentLength);
+          lastProcessedLengthRef.current.set(agentName, currentLength);
 
           const previousThoughts = agent.diaryEntries.map(
             (entry) => entry.content
           );
           const response = await generateAgentThoughts(
-            fullTranscript,
+            currentTranscript,
             agent.role,
             agent.name,
             previousThoughts,
@@ -855,12 +875,13 @@ export default function Page() {
         }, interval);
 
         return intervalId;
-      });
+      }
+    );
 
     return () => {
       intervalIds.forEach((id) => clearInterval(id));
     };
-  }, [agents, fullTranscript, addAgentThought, models.small]);
+  }, [hasTranscript, addAgentThought, models.small]);
 
   const handleNodeSelect = (id: string) => {
     setSelectedNodes((prev) =>
