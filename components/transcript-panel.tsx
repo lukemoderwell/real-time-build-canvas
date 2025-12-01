@@ -81,7 +81,10 @@ export function TranscriptPanel({
 
   if (isMinimized) {
     return (
-      <div className='w-12 h-full border-r border-white/10 flex flex-col z-20 absolute left-0 top-0 shadow-2xl'>
+      <div 
+        style={{ backgroundColor: 'var(--primary-dark)' }}
+        className='w-12 h-full border-r border-white/10 flex flex-col z-20 absolute left-0 top-0 shadow-2xl'
+      >
         <div className='p-4 border-b border-border flex items-center justify-center'>
           {onToggleMinimize && (
             <button
@@ -114,8 +117,8 @@ export function TranscriptPanel({
 
   return (
     <div
-      style={{ width: `${resizeWidth}px` }}
-      className='h-full flex flex-col z-20 absolute left-0 top-0 shadow-2xl bg-card/50'
+      style={{ width: `${resizeWidth}px`, backgroundColor: 'var(--primary-dark)' }}
+      className='h-full flex flex-col z-20 absolute left-0 top-0 shadow-2xl'
     >
       <ResizeHandle
         direction='right'
