@@ -161,10 +161,14 @@ export function AgentSidebar({
                     <div className='space-y-3 mt-3'>
                       {(['small', 'medium', 'large'] as const).map((tier) => (
                         <div key={tier} className='space-y-1'>
-                          <Label className='text-xs capitalize'>{tier} Tasks</Label>
+                          <Label className='text-xs capitalize'>
+                            {tier} Tasks
+                          </Label>
                           <Select
                             value={modelSettings[tier]}
-                            onValueChange={(value) => onModelChange(tier, value)}
+                            onValueChange={(value) =>
+                              onModelChange(tier, value)
+                            }
                           >
                             <SelectTrigger className='h-8 text-xs'>
                               <SelectValue>
@@ -211,7 +215,8 @@ export function AgentSidebar({
           />
         ))}
       </div>
-    </div>
+
+      </div>
   );
 }
 
