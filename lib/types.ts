@@ -73,3 +73,9 @@ export interface TranscriptEntry {
   text: string;
   timestamp: number;
 }
+
+export interface TranscriptSegment {
+  id: string;
+  timestamp: number; // Unix timestamp when segment started
+  text: string; // The transcribed text for this segment
+}

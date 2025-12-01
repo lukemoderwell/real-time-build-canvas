@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { CanvasBoard } from '@/components/canvas-board';
 import { AgentSidebar } from '@/components/agent-sidebar';
 import { TranscriptPanel } from '@/components/transcript-panel';
@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { Agent, NodeData, NodeGroup } from '@/lib/types';
+import type { Agent, NodeData, NodeGroup, TranscriptSegment } from '@/lib/types';
 import {
   generateId,
   mergeFeatureDetails,
@@ -115,7 +115,8 @@ export default function Page() {
   });
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(true);
   const [currentSessionText, setCurrentSessionText] = useState('');
-  const [fullTranscript, setFullTranscript] = useState('');
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
   const [buildPrompt, setBuildPrompt] = useState<string | null>(null);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
@@ -143,6 +144,12 @@ export default function Page() {
     isOpen: boolean;
     featuresToDelete: NodeGroup[];
   }>({ isOpen: false, featuresToDelete: [] });
+
+  // Computed full transcript for backward compatibility (agent thinking, etc.)
+  const fullTranscript = useMemo(
+    () => transcriptSegments.map((s) => s.text).join(' '),
+    [transcriptSegments]
+  );
 
   const addAgentThought = useCallback((agentId: string, content: string) => {
     setAgents((prev) =>
@@ -602,12 +609,6 @@ export default function Page() {
         return newText;
       });
 
-      // Add final text to full transcript
-      setFullTranscript((prev) => {
-        // Append with space if there's existing text
-        return prev + (prev && !prev.endsWith('\n\n') ? ' ' : '') + finalText;
-      });
-
       // Add to transcript buffer for interval processing
       setTranscriptBuffer((prev) => [...prev, finalText]);
     }
@@ -620,8 +621,14 @@ export default function Page() {
   // Helper to stop recording with transcript processing
   const handleStopRecording = useCallback(async () => {
     if (currentSessionText.trim()) {
+      // Create a new transcript segment
+      const newSegment: TranscriptSegment = {
+        id: generateId(),
+        timestamp: Date.now(),
+        text: currentSessionText.trim(),
+      };
+      setTranscriptSegments((prev) => [...prev, newSegment]);
       setCurrentSessionText('');
-      setFullTranscript((prev) => prev + '\n\n');
     }
     stopListening();
 
@@ -638,8 +645,14 @@ export default function Page() {
   // Helper to stop PTT recording with immediate analysis
   const handleStopPTT = useCallback(async () => {
     if (currentSessionText.trim()) {
+      // Create a new transcript segment
+      const newSegment: TranscriptSegment = {
+        id: generateId(),
+        timestamp: Date.now(),
+        text: currentSessionText.trim(),
+      };
+      setTranscriptSegments((prev) => [...prev, newSegment]);
       setCurrentSessionText('');
-      setFullTranscript((prev) => prev + '\n\n');
     }
     stopListening();
 
@@ -657,6 +670,13 @@ export default function Page() {
     onStopRecording: handleStopRecording,
     onStopPTT: handleStopPTT,
   });
+
+  // Set session start time when recording first starts
+  useEffect(() => {
+    if (isListening && sessionStartTime === null) {
+      setSessionStartTime(Date.now());
+    }
+  }, [isListening, sessionStartTime]);
 
   // Delete only capabilities (used by backspace/delete key)
   // This will NOT delete features - only removes capabilities from them
@@ -1063,8 +1083,9 @@ export default function Page() {
     <main className='flex h-screen w-screen overflow-hidden bg-background text-foreground'>
       <div className='flex-1 relative'>
         <TranscriptPanel
-          fullTranscript={fullTranscript}
+          transcriptSegments={transcriptSegments}
           currentSessionText={currentSessionText}
+          sessionStartTime={sessionStartTime}
           isRecording={isListening}
           recordingMode={recordingMode}
           isAnalyzing={isAnalyzing}

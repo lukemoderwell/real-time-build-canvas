@@ -5,10 +5,12 @@ import { useEffect, useRef } from 'react';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useResizable } from '@/hooks/use-resizable';
 import { ResizeHandle } from '@/components/resize-handle';
+import type { TranscriptSegment } from '@/lib/types';
 
 interface TranscriptPanelProps {
-  fullTranscript: string;
+  transcriptSegments: TranscriptSegment[];
   currentSessionText: string;
+  sessionStartTime: number | null;
   isRecording: boolean;
   recordingMode?: 'idle' | 'ptt' | 'toggle';
   isAnalyzing?: boolean;
@@ -18,9 +20,18 @@ interface TranscriptPanelProps {
   onWidthChange: (width: number) => void;
 }
 
+function formatDuration(startTime: number, segmentTime: number): string {
+  const diffMs = segmentTime - startTime;
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function TranscriptPanel({
-  fullTranscript,
+  transcriptSegments,
   currentSessionText,
+  sessionStartTime,
   isRecording,
   recordingMode = 'idle',
   isAnalyzing = false,
@@ -58,13 +69,9 @@ export function TranscriptPanel({
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
     }
-  }, [fullTranscript, currentSessionText, isRecording]);
+  }, [transcriptSegments, currentSessionText, isRecording]);
 
-  const displayText =
-    fullTranscript +
-    (currentSessionText
-      ? (fullTranscript ? ' ' : '') + currentSessionText
-      : '');
+  const hasContent = transcriptSegments.length > 0 || currentSessionText;
 
   if (isMinimized) {
     return (
@@ -148,20 +155,41 @@ export function TranscriptPanel({
         ref={scrollRef}
         className='flex-1 overflow-y-auto p-4 custom-scrollbar'
       >
-        {!displayText ? (
+        {!hasContent ? (
           <div className='text-muted-foreground text-sm'>
             Start speaking to generate transcript...
           </div>
         ) : (
           <div className='space-y-4'>
-            <div className='space-y-1'>
-              <div className='text-xs font-medium text-muted-foreground'>
-                me
+            {transcriptSegments.map((segment, index) => (
+              <div key={segment.id}>
+                {index > 0 && (
+                  <div className='border-t border-border/50 my-4' />
+                )}
+                <div className='space-y-1'>
+                  <div className='text-xs font-medium text-muted-foreground'>
+                    {sessionStartTime
+                      ? formatDuration(sessionStartTime, segment.timestamp)
+                      : '0:00'}
+                  </div>
+                  <div className='text-[14px] leading-relaxed text-foreground whitespace-pre-wrap'>
+                    {segment.text}
+                  </div>
+                </div>
               </div>
-              <div className='text-[14px] leading-relaxed text-foreground whitespace-pre-wrap'>
-                {displayText}
+            ))}
+
+            {/* Currently streaming segment - no timestamp until recording stops */}
+            {currentSessionText && (
+              <div>
+                {transcriptSegments.length > 0 && (
+                  <div className='border-t border-border/50 my-4' />
+                )}
+                <div className='text-[14px] leading-relaxed text-foreground whitespace-pre-wrap'>
+                  {currentSessionText}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
